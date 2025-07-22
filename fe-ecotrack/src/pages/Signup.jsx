@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { auth } from '../firebase';
 import Header from '../components/Header';
 import Toast from '../components/Toast';
@@ -11,6 +11,7 @@ export default function Signup() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [acceptedPDA, setAcceptedPDA] = useState(false);
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [toast, setToast] = useState(null);
@@ -46,15 +47,34 @@ export default function Signup() {
       await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email }),
+        body: JSON.stringify({ name, email, marketing_opt_in: marketingOptIn }),
       });
 
       showToast('Account created successfully!');
-
-      setTimeout(() => navigate('/home'), 1000); // 🔁 redirect after success
+      setTimeout(() => navigate('/home'), 1000);
     } catch (error) {
       console.error('Signup Error:', error);
       showToast(error.message || 'Registration failed.', 'error');
+    }
+  };
+
+  const handleGoogleSignup = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: user.displayName, email: user.email, marketing_opt_in: true }),
+      });
+
+      showToast('Signed in with Google!');
+      setTimeout(() => navigate('/home'), 1000);
+    } catch (error) {
+      console.error('Google Sign-In Error:', error);
+      showToast('Google sign-in failed.', 'error');
     }
   };
 
@@ -63,21 +83,16 @@ export default function Signup() {
       className="min-h-screen bg-cover bg-center bg-no-repeat relative"
       style={{ backgroundImage: `url('/loginbg.jpg')` }}
     >
-      {/* Overlay */}
       <div className="absolute inset-0 bg-black bg-opacity-50 z-0" />
-
-      {/* Header */}
       <div className="relative z-10">
         <Header />
       </div>
 
-      {/* Signup Form */}
       <div className="relative z-10 flex items-center justify-center min-h-screen px-4 pt-10 md:pt-0">
         <div className="bg-white bg-opacity-90 backdrop-blur-md p-8 rounded-lg shadow-lg max-w-md w-full">
           <h2 className="text-3xl font-bold text-center text-green-700 mb-6">Sign Up</h2>
 
           <form onSubmit={handleSignup} className="space-y-4">
-            {/* Full Name */}
             <input
               type="text"
               placeholder="Full Name"
@@ -87,7 +102,6 @@ export default function Signup() {
               className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-green-600 focus:outline-none"
             />
 
-            {/* Email */}
             <input
               type="email"
               placeholder="Email"
@@ -97,7 +111,6 @@ export default function Signup() {
               className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-green-600 focus:outline-none"
             />
 
-            {/* Password */}
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
@@ -115,7 +128,6 @@ export default function Signup() {
               </span>
             </div>
 
-            {/* Confirm Password */}
             <div className="relative">
               <input
                 type={showConfirmPassword ? 'text' : 'password'}
@@ -133,7 +145,6 @@ export default function Signup() {
               </span>
             </div>
 
-            {/* Personal Data Agreement */}
             <div className="flex items-start gap-2 mt-2">
               <input
                 type="checkbox"
@@ -155,16 +166,37 @@ export default function Signup() {
               </label>
             </div>
 
-            {/* Submit */}
+            <div className="flex items-start gap-2 mt-2">
+              <input
+                type="checkbox"
+                id="marketing"
+                checked={marketingOptIn}
+                onChange={(e) => setMarketingOptIn(e.target.checked)}
+                className="mt-1"
+              />
+              <label htmlFor="marketing" className="text-sm text-gray-700 leading-snug">
+                I agree to receive occasional tips and recycling reminders from EcoTrack via email.
+              </label>
+            </div>
+
             <button
               type="submit"
               className="w-full bg-green-600 text-white py-2 rounded-md font-semibold hover:bg-green-700 transition"
             >
               Register
             </button>
+
+            <div className="text-center my-4 text-gray-500">OR</div>
+
+            <button
+              type="button"
+              onClick={handleGoogleSignup}
+              className="w-full border border-green-600 text-green-700 py-2 rounded-md font-semibold hover:bg-green-50 transition"
+            >
+              Continue with Google
+            </button>
           </form>
 
-          {/* Redirect to Login */}
           <p className="text-center mt-4 text-sm text-gray-700">
             Already have an account?{' '}
             <span
@@ -177,7 +209,6 @@ export default function Signup() {
         </div>
       </div>
 
-      {/* Toast */}
       {toast && (
         <Toast
           message={toast.message}
