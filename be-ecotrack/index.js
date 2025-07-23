@@ -1,5 +1,7 @@
-// 🌱 Load Environment Variables
-require('dotenv').config();
+// 🌱 Load Environment Variables (only in local development)
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
 
 // 📦 Dependencies
 const express = require('express');
@@ -26,21 +28,28 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 🖼️ Static Assets (only works on localhost, not Vercel)
+// 🖼️ Static Assets (local dev only)
 if (process.env.NODE_ENV !== 'production') {
   app.use('/images', express.static(path.join(__dirname, 'public/images')));
 }
 
 // 🔌 API Routes
-app.use('/api', require('./routes/auth')(pool));
-app.use('/api', require('./routes/contact')(pool));
-app.use('/api', require('./routes/marketplace')(pool));
-app.use('/api', require('./routes/recycling')(pool));
-app.use('/api', require('./routes/locations')(pool));
-app.use('/api', require('./routes/progress')(pool));
-app.use('/api', require('./routes/leaderboard')(pool));
+const routes = [
+  './routes/auth',
+  './routes/contact',
+  './routes/marketplace',
+  './routes/recycling',
+  './routes/locations',
+  './routes/progress',
+  './routes/leaderboard',
+];
 
-// 📨 Cron endpoint (manual trigger for now)
+routes.forEach(routePath => {
+  const route = require(routePath);
+  app.use('/api', route(pool));
+});
+
+// 📨 Cron Endpoint (Manual trigger)
 app.get('/api/send-tips', async (req, res) => {
   try {
     await sendTips();
@@ -56,7 +65,7 @@ app.get('/', (req, res) => {
   res.send('✅ EcoTrack Backend is Running!');
 });
 
-// 🔄 Local Dev Server (Skip this in Vercel serverless mode)
+// 🔄 Local Dev Server (Skip this in Vercel)
 if (require.main === module) {
   const PORT = process.env.PORT || 5050;
   app.listen(PORT, () => {
@@ -64,5 +73,5 @@ if (require.main === module) {
   });
 }
 
-// 🔁 Export the app for Vercel serverless deployment
+// 🔁 Export the app (for Vercel Serverless Function)
 module.exports = app;
