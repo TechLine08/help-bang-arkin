@@ -9,10 +9,10 @@ const seedLocations = require('./locationsSeed');
     console.log('🌱 Seeding Locations...');
     await seedLocations();
 
-    console.log('✅ All seeds done!');
-    process.exit();
+    console.log('✅ All seeds completed successfully!');
+    process.exit(0);
   } catch (err) {
-    console.error('❌ Seed failed:', err);
+    console.error('❌ Seeding failed:', err);
     process.exit(1);
   }
 })();

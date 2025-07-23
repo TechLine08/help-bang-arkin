@@ -8,8 +8,14 @@
   ],
   "routes": [
     {
-      "src": "/.*",
-      "dest": "/index.js"
+      "src": "/(.*)",
+      "dest": "index.js"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/send-tips",
+      "schedule": "0 8 * * *"
     }
   ]
 }

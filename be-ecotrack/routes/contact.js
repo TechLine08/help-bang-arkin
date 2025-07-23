@@ -1,46 +1,58 @@
-const express = require('express');
-const nodemailer = require('nodemailer');
-const router = express.Router();
+import nodemailer from 'nodemailer';
 
-module.exports = (pool) => {
-  const transporter = nodemailer.createTransport({
-    host: process.env.MAIL_HOST,
-    port: process.env.MAIL_PORT,
-    auth: {
-      user: process.env.MAIL_USER,
-      pass: process.env.MAIL_PASS,
-    },
-  });
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
 
-  router.post('/contact', async (req, res) => {
-    const { name, email, message } = req.body;
-    if (!name || !email || !message) {
-      return res.status(400).json({ error: 'Name, email, and message are required.' });
+  const { name, email, message } = req.body;
+
+  if (!name || !email || !message) {
+    return res.status(400).json({ error: 'Name, email, and message are required.' });
+  }
+
+  try {
+    // Save to Supabase
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const response = await fetch(`${supabaseUrl}/rest/v1/contact_messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
+      },
+      body: JSON.stringify({ name, email, message }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to save contact message to Supabase');
     }
 
-    try {
-      // Save to database
-      await pool.query(
-        `INSERT INTO contact_messages (name, email, message) VALUES ($1, $2, $3)`,
-        [name, email, message]
-      );
+    // Send email via Mailtrap
+    const transporter = nodemailer.createTransport({
+      host: process.env.MAIL_HOST,
+      port: process.env.MAIL_PORT,
+      auth: {
+        user: process.env.MAIL_USER,
+        pass: process.env.MAIL_PASS,
+      },
+    });
 
-      // Send via Mailtrap
-      await transporter.sendMail({
-        from: process.env.FROM_EMAIL,
-        to: process.env.MAIL_USER,
-        subject: 'EcoTrack Contact Form Submission',
-        html: `<p><strong>Name:</strong> ${name}</p>
-               <p><strong>Email:</strong> ${email}</p>
-               <p><strong>Message:</strong><br/>${message}</p>`,
-      });
+    await transporter.sendMail({
+      from: email,
+      to: process.env.TO_EMAIL,
+      subject: 'EcoTrack Contact Form Submission',
+      html: `
+        <p><strong>Name:</strong> ${name}</p>
+        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Message:</strong><br/>${message}</p>
+      `,
+    });
 
-      res.status(201).json({ success: true });
-    } catch (err) {
-      console.error('❌ Error handling contact form:', err);
-      res.status(500).json({ error: 'Internal Server Error' });
-    }
-  });
-
-  return router;
-};
+    res.status(201).json({ success: true });
+  } catch (err) {
+    console.error('❌ Contact form error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+}

@@ -5,33 +5,40 @@ const router = express.Router();
 
 module.exports = (pool) => {
   /**
-   * GET /api/progress
-   * Returns total bottles, total mass (kg), and calculated eco points for the authenticated user.
+   * 🟢 GET /api/progress
+   * Authenticated: Returns total bottles, mass, and eco points for the current user.
    */
   router.get('/progress', authMiddleware, async (req, res) => {
-    const { user } = req;
+    const { userId } = req.user;
 
     try {
-      const result = await pool.query(
-        `SELECT
-           SUM(CASE WHEN waste_type = 'plastic_bottle' THEN quantity ELSE 0 END) AS total_bottles,
-           SUM(CASE WHEN waste_type = 'mass' THEN quantity ELSE 0 END) AS total_mass
-         FROM recycling_logs
-         WHERE user_id = $1`,
-        [user.userId]
+      const { rows } = await pool.query(
+        `
+        SELECT
+          COALESCE(SUM(CASE WHEN waste_type = 'plastic_bottle' THEN quantity ELSE 0 END), 0) AS total_bottles,
+          COALESCE(SUM(CASE WHEN waste_type = 'mass' THEN quantity ELSE 0 END), 0) AS total_mass
+        FROM recycling_logs
+        WHERE user_id = $1
+        `,
+        [userId]
       );
 
-      const totals = result.rows[0] || {};
-      const totalBottles = Number(totals.total_bottles) || 0;
-      const totalMass = Number(totals.total_mass) || 0;
+      const { total_bottles, total_mass } = rows[0];
 
-      // 🎯 Simple eco point formula (can be refined later)
-      const points = totalBottles * 5 + totalMass * 10;
+      // 🎯 Points calculation (configurable later)
+      const points = total_bottles * 5 + total_mass * 10;
 
-      res.json({ totalBottles, totalMass, points });
+      res.status(200).json({
+        success: true,
+        data: {
+          totalBottles: total_bottles,
+          totalMass: total_mass,
+          points,
+        },
+      });
     } catch (err) {
-      console.error('❌ Error fetching progress:', err);
-      res.status(500).json({ error: 'Internal Server Error' });
+      console.error('❌ Error fetching user progress:', err);
+      res.status(500).json({ success: false, error: 'Internal Server Error' });
     }
   });
 

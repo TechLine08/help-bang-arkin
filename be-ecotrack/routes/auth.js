@@ -6,6 +6,7 @@ const nodemailer = require('nodemailer');
 const router = express.Router();
 
 module.exports = (pool) => {
+  // 📨 Email transporter (Mailtrap or other)
   const transporter = nodemailer.createTransport({
     host: process.env.MAIL_HOST,
     port: process.env.MAIL_PORT,
@@ -24,11 +25,11 @@ module.exports = (pool) => {
         html,
       });
     } catch (err) {
-      console.error('Error sending email:', err);
+      console.error('❌ Error sending email:', err);
     }
   };
 
-  // 🆕 Create or Upsert User (for Google or Email signup)
+  // 🆕 Register or Upsert User (email or Google)
   router.post('/users', async (req, res) => {
     const { name, email, marketing_opt_in = false } = req.body;
     if (!name || !email) return res.status(400).json({ error: 'Missing fields' });
@@ -43,7 +44,7 @@ module.exports = (pool) => {
       );
       res.status(200).json({ success: true });
     } catch (err) {
-      console.error('User insert/upsert error:', err);
+      console.error('❌ User insert/upsert error:', err);
       res.status(500).json({ error: 'Server error' });
     }
   });
@@ -51,23 +52,29 @@ module.exports = (pool) => {
   // 🔐 Login
   router.post('/login', async (req, res) => {
     const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Missing credentials' });
+
     try {
       const result = await pool.query(`SELECT * FROM users WHERE email = $1`, [email]);
       const user = result.rows[0];
 
-      if (!user || !(await bcrypt.compare(password, user.password))) {
+      if (!user || !user.password || !(await bcrypt.compare(password, user.password))) {
         return res.status(401).json({ error: 'Invalid credentials' });
       }
 
       const token = jwt.sign(
         { userId: user.id, email: user.email },
         process.env.JWT_SECRET,
-        { expiresIn: '7d' }
+        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
       );
 
-      res.json({ success: true, token, user: { id: user.id, name: user.name, email: user.email } });
+      res.json({
+        success: true,
+        token,
+        user: { id: user.id, name: user.name, email: user.email }
+      });
     } catch (err) {
-      console.error('Login error:', err);
+      console.error('❌ Login error:', err);
       res.status(500).json({ error: 'Internal server error' });
     }
   });
@@ -75,13 +82,18 @@ module.exports = (pool) => {
   // 🔑 Forgot Password
   router.post('/forgot-password', async (req, res) => {
     const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+
     try {
       const result = await pool.query(`SELECT * FROM users WHERE email = $1`, [email]);
       const user = result.rows[0];
+
+      // Respond as if email exists even if not found (security)
       if (!user) return res.status(200).json({ success: true });
 
       const token = crypto.randomBytes(32).toString('hex');
-      const expires = new Date(Date.now() + 3600000);
+      const expires = new Date(Date.now() + 3600000); // 1 hour
+
       await pool.query(
         `UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE id = $3`,
         [token, expires, user.id]
@@ -91,20 +103,32 @@ module.exports = (pool) => {
       await sendEmail({
         to: email,
         subject: 'Reset your EcoTrack password',
-        html: `<p>Click the link below to reset your password:</p><a href="${resetLink}">${resetLink}</a>`
+        html: `
+          <div style="font-family: sans-serif;">
+            <p>Hello,</p>
+            <p>You requested to reset your EcoTrack password.</p>
+            <p><a href="${resetLink}" target="_blank">Click here to reset your password</a></p>
+            <p>This link will expire in 1 hour.</p>
+          </div>
+        `
       });
 
       res.json({ success: true });
     } catch (err) {
-      console.error('Forgot password error:', err);
+      console.error('❌ Forgot password error:', err);
       res.status(500).json({ error: 'Server error' });
     }
   });
 
-  // 🔄 Reset Password
+  // 🔁 Reset Password
   router.post('/reset-password/:token', async (req, res) => {
-    const { password } = req.body;
     const { token } = req.params;
+    const { password } = req.body;
+
+    if (!password || !token) {
+      return res.status(400).json({ error: 'Missing token or password' });
+    }
+
     try {
       const result = await pool.query(
         `SELECT * FROM users WHERE reset_token = $1 AND reset_token_expires > NOW()`,
@@ -121,7 +145,7 @@ module.exports = (pool) => {
 
       res.json({ success: true });
     } catch (err) {
-      console.error('Reset password error:', err);
+      console.error('❌ Reset password error:', err);
       res.status(500).json({ error: 'Server error' });
     }
   });

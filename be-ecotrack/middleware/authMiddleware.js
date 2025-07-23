@@ -1,13 +1,17 @@
 const jwt = require('jsonwebtoken');
 
+/**
+ * Middleware to protect routes using JWT.
+ * Expects token in 'Authorization: Bearer <token>' or optionally in cookies.
+ */
 const authMiddleware = (req, res, next) => {
   const authHeader = req.headers.authorization;
+  const token =
+    authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : req.cookies?.token;
 
-  if (!authHeader?.startsWith('Bearer ')) {
+  if (!token) {
     return res.status(401).json({ error: 'Unauthorized: Missing token' });
   }
-
-  const token = authHeader.split(' ')[1];
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -15,7 +19,7 @@ const authMiddleware = (req, res, next) => {
     next();
   } catch (err) {
     console.error('❌ Invalid token:', err.message);
-    res.status(403).json({ error: 'Invalid or expired token' });
+    return res.status(403).json({ error: 'Invalid or expired token' });
   }
 };
 

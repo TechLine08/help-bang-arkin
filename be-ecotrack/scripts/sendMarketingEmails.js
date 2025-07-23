@@ -1,8 +1,9 @@
-// scripts/sendMarketingEmails.js
+// backend/scripts/sendMarketingEmails.js
 require('dotenv').config();
 const { Pool } = require('pg');
 const nodemailer = require('nodemailer');
 
+// DB Pool
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production'
@@ -10,7 +11,7 @@ const pool = new Pool({
     : false,
 });
 
-// 🌱 Rotating Tips
+// Daily Tips
 const tips = [
   "♻️ Rinse bottles before recycling to avoid contamination.",
   "🌱 Bring your own bag to reduce plastic waste.",
@@ -22,7 +23,7 @@ const tips = [
   "🍃 Start composting food waste at home.",
 ];
 
-// ✉️ Mailer
+// Mailer
 const transporter = nodemailer.createTransport({
   host: process.env.MAIL_HOST,
   port: process.env.MAIL_PORT,
@@ -35,36 +36,42 @@ const transporter = nodemailer.createTransport({
 const sendEmail = async ({ to, subject, html }) => {
   try {
     await transporter.sendMail({
-      from: process.env.FROM_EMAIL,
+      from: `"EcoTrack" <${process.env.FROM_EMAIL}>`,
       to,
       subject,
       html,
     });
   } catch (err) {
-    console.error(`❌ Email error to ${to}:`, err);
+    console.error(`❌ Failed to send email to ${to}:`, err.message);
   }
 };
 
-// 🔁 Send Daily Tips Function
 const sendTips = async () => {
   const client = await pool.connect();
   try {
-    const res = await client.query(
+    const { rows: users } = await client.query(
       `SELECT id, name, email, last_tip_index
        FROM users
        WHERE marketing_opt_in = true`
     );
 
-    for (const user of res.rows) {
-      const index = user.last_tip_index || 0;
+    if (!users.length) {
+      console.log('ℹ️ No subscribed users to send tips.');
+      return;
+    }
+
+    for (const user of users) {
+      const index = user.last_tip_index ?? 0;
       const tip = tips[index];
 
       const html = `
-        <h2>Hi ${user.name},</h2>
-        <p>Here's your eco tip for today:</p>
-        <blockquote style="font-size: 1.2em;">${tip}</blockquote>
-        <p>Let’s take action today 🌍</p>
-        <a href="${process.env.FRONTEND_URL}" style="display: inline-block; padding: 10px 15px; background: green; color: white; text-decoration: none; border-radius: 5px;">Open EcoTrack</a>
+        <div style="font-family: sans-serif; padding: 1rem;">
+          <h2>Hi ${user.name},</h2>
+          <p>Here's your eco tip for today:</p>
+          <blockquote style="font-size: 1.2em; margin: 1em 0; color: #2e7d32;">${tip}</blockquote>
+          <p>Let’s take action today 🌍</p>
+          <a href="${process.env.FRONTEND_URL}" style="display:inline-block;padding:10px 20px;background:#388e3c;color:#fff;text-decoration:none;border-radius:5px;">Open EcoTrack</a>
+        </div>
       `;
 
       await sendEmail({
@@ -80,19 +87,19 @@ const sendTips = async () => {
       );
     }
 
-    console.log(`✅ Sent daily tips to ${res.rows.length} users.`);
+    console.log(`✅ Sent eco tips to ${users.length} users.`);
   } catch (err) {
-    console.error('❌ Error sending marketing emails:', err);
-    throw err; // so Vercel serverless function catches it too
+    console.error('❌ Error during sendTips():', err);
+    throw err;
   } finally {
     client.release();
   }
 };
 
-// 🧪 CLI mode (only runs if called directly)
+// 👇 CLI Support
 if (require.main === module) {
   sendTips();
 }
 
-// 📤 Export for Vercel or other use
+// 👇 Vercel or import support
 module.exports = { sendTips };
