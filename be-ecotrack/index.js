@@ -15,7 +15,7 @@ const pool = new Pool({
     : false,
 });
 
-// 📧 Import marketing tip sender
+// 📧 Marketing Email Sender
 const { sendTips } = require('./scripts/sendMarketingEmails');
 
 // 🚀 Initialize Express App
@@ -26,8 +26,10 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 🖼️ Static Assets (e.g., images for vouchers)
-app.use('/images', express.static(path.join(__dirname, 'public/images')));
+// 🖼️ Static Assets (only works on localhost, not Vercel)
+if (process.env.NODE_ENV !== 'production') {
+  app.use('/images', express.static(path.join(__dirname, 'public/images')));
+}
 
 // 🔌 API Routes
 app.use('/api', require('./routes/auth')(pool));
@@ -38,7 +40,7 @@ app.use('/api', require('./routes/locations')(pool));
 app.use('/api', require('./routes/progress')(pool));
 app.use('/api', require('./routes/leaderboard')(pool));
 
-// 📨 Cron route for marketing tips
+// 📨 Cron endpoint (manual trigger for now)
 app.get('/api/send-tips', async (req, res) => {
   try {
     await sendTips();
@@ -54,7 +56,7 @@ app.get('/', (req, res) => {
   res.send('✅ EcoTrack Backend is Running!');
 });
 
-// 🧪 Local development server (only if run directly)
+// 🔄 Local Dev Server (Skip this in Vercel serverless mode)
 if (require.main === module) {
   const PORT = process.env.PORT || 5050;
   app.listen(PORT, () => {
@@ -62,5 +64,5 @@ if (require.main === module) {
   });
 }
 
-// 📦 Export app for Vercel
+// 🔁 Export the app for Vercel serverless deployment
 module.exports = app;
