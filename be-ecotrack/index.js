@@ -9,13 +9,21 @@ const cors = require('cors');
 const { Pool } = require('pg');
 const path = require('path');
 
+// ✅ Log the environment and check DATABASE_URL
+console.log('🌍 NODE_ENV:', process.env.NODE_ENV);
+console.log('🛢️ DATABASE_URL:', process.env.DATABASE_URL || '❌ Not defined');
+
 // 🗄️ PostgreSQL Connection Pool
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production'
-    ? { rejectUnauthorized: false }
-    : false,
-});
+let pool;
+try {
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  });
+  console.log('✅ PostgreSQL pool created');
+} catch (err) {
+  console.error('❌ Failed to create PostgreSQL pool:', err);
+}
 
 // 📧 Marketing Email Sender
 const { sendTips } = require('./scripts/sendMarketingEmails');
@@ -44,9 +52,14 @@ const routes = [
   './routes/leaderboard',
 ];
 
-routes.forEach(routePath => {
-  const route = require(routePath);
-  app.use('/api', route(pool));
+routes.forEach((routePath) => {
+  try {
+    const route = require(routePath);
+    app.use('/api', route(pool));
+    console.log(`✅ Loaded route: ${routePath}`);
+  } catch (err) {
+    console.error(`❌ Failed to load route ${routePath}:`, err.message);
+  }
 });
 
 // 📨 Cron Endpoint (Manual trigger)
@@ -65,13 +78,19 @@ app.get('/', (req, res) => {
   res.send('✅ EcoTrack Backend is Running!');
 });
 
-// 🔄 Local Dev Server (Skip this in Vercel)
+// 🛠️ Global Error Handler
+app.use((err, req, res, next) => {
+  console.error('🔥 Uncaught error:', err.stack);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
+// 🔄 Local Dev Server (Skip in Vercel)
 if (require.main === module) {
   const PORT = process.env.PORT || 5050;
   app.listen(PORT, () => {
-    console.log(`✅ Server running locally at http://localhost:${PORT}`);
+    console.log(`🚀 Server running locally at http://localhost:${PORT}`);
   });
 }
 
-// 🔁 Export the app (for Vercel Serverless Function)
+// 🔁 Export app (for Vercel)
 module.exports = app;
