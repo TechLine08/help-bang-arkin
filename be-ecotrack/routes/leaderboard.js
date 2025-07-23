@@ -1,15 +1,17 @@
-// 🏆 routes/leaderboard.js
 const express = require('express');
-const router = express.Router();
 
 module.exports = (pool) => {
+  const router = express.Router();
+
+  console.log('🏆 Leaderboard route initialized');
+
   /**
    * 🧑‍🤝‍🧑 GET /api/leaderboard/users
    * Returns top 10 users based on total quantity recycled.
    */
   router.get('/leaderboard/users', async (req, res) => {
     try {
-      const { rows } = await pool.query(
+      const result = await pool.query(
         `SELECT u.name, u.country, COALESCE(SUM(r.quantity), 0)::INT AS total_recycled
          FROM users u
          JOIN recycling_logs r ON u.id = r.user_id
@@ -17,9 +19,10 @@ module.exports = (pool) => {
          ORDER BY total_recycled DESC
          LIMIT 10`
       );
-      res.status(200).json({ success: true, data: rows });
+
+      res.status(200).json({ success: true, data: result.rows });
     } catch (err) {
-      console.error('❌ Failed to fetch user leaderboard:', err);
+      console.error('❌ Failed to fetch user leaderboard:', err.message);
       res.status(500).json({ success: false, error: 'Internal Server Error' });
     }
   });
@@ -30,7 +33,7 @@ module.exports = (pool) => {
    */
   router.get('/leaderboard/countries', async (req, res) => {
     try {
-      const { rows } = await pool.query(
+      const result = await pool.query(
         `SELECT u.country, COALESCE(SUM(r.quantity), 0)::INT AS total_recycled
          FROM users u
          JOIN recycling_logs r ON u.id = r.user_id
@@ -38,9 +41,10 @@ module.exports = (pool) => {
          ORDER BY total_recycled DESC
          LIMIT 10`
       );
-      res.status(200).json({ success: true, data: rows });
+
+      res.status(200).json({ success: true, data: result.rows });
     } catch (err) {
-      console.error('❌ Failed to fetch country leaderboard:', err);
+      console.error('❌ Failed to fetch country leaderboard:', err.message);
       res.status(500).json({ success: false, error: 'Internal Server Error' });
     }
   });
