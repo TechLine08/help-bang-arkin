@@ -4,8 +4,7 @@
   "description": "Backend API for EcoTrack project",
   "main": "index.js",
   "scripts": {
-    "start": "nodemon index.js",
-    "dev": "nodemon index.js"
+    "start": "node index.js"
   },
   "keywords": [
     "ecotrack",
@@ -23,7 +22,6 @@
     "express": "^5.1.0",
     "node-cron": "^4.2.1",
     "nodemailer": "^7.0.5",
-    "nodemon": "^3.1.10",
     "pg": "^8.16.3"
   }
 }
