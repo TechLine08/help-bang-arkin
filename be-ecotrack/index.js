@@ -9,7 +9,7 @@ const cors = require('cors');
 const { Pool } = require('pg');
 const path = require('path');
 
-// ✅ Log the environment and check DATABASE_URL
+// ✅ Log the environment
 console.log('🌍 NODE_ENV:', process.env.NODE_ENV);
 console.log('🛢️ DATABASE_URL:', process.env.DATABASE_URL || '❌ Not defined');
 
@@ -36,12 +36,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 🖼️ Static Assets (local dev only)
+// 🖼️ Static Assets (Local only)
 if (process.env.NODE_ENV !== 'production') {
   app.use('/images', express.static(path.join(__dirname, 'public/images')));
 }
 
-// 🔌 API Routes
+// 🔌 API Routes (Safe Load)
 const routes = [
   './routes/auth',
   './routes/contact',
@@ -49,7 +49,7 @@ const routes = [
   './routes/recycling',
   './routes/locations',
   './routes/progress',
-  './routes/leaderboard',
+  // './routes/leaderboard', // ⛔ Temporarily disabled to prevent crash
 ];
 
 routes.forEach((routePath) => {
@@ -58,11 +58,11 @@ routes.forEach((routePath) => {
     app.use('/api', route(pool));
     console.log(`✅ Loaded route: ${routePath}`);
   } catch (err) {
-    console.error(`❌ Failed to load route ${routePath}:`, err.message);
+    console.error(`❌ Failed to load route ${routePath}: ${err.message}`);
   }
 });
 
-// 📨 Cron Endpoint (Manual trigger)
+// 📨 Manual Cron Trigger Endpoint
 app.get('/api/send-tips', async (req, res) => {
   try {
     await sendTips();
@@ -78,13 +78,13 @@ app.get('/', (req, res) => {
   res.send('✅ EcoTrack Backend is Running!');
 });
 
-// 🛠️ Global Error Handler
+// 🧯 Global Error Handler
 app.use((err, req, res, next) => {
   console.error('🔥 Uncaught error:', err.stack);
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// 🔄 Local Dev Server (Skip in Vercel)
+// 🔄 Local Dev Server
 if (require.main === module) {
   const PORT = process.env.PORT || 5050;
   app.listen(PORT, () => {
@@ -92,5 +92,5 @@ if (require.main === module) {
   });
 }
 
-// 🔁 Export app (for Vercel)
+// 🧪 Export app (Vercel needs this)
 module.exports = app;
