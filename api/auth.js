@@ -1,4 +1,4 @@
-// File: /api/auth.js (Vercel-compatible, Full CRUD + Fetch)
+// File: /api/auth.js
 
 const { Pool } = require('pg');
 
@@ -14,7 +14,6 @@ module.exports = async (req, res) => {
 
   if (method === 'GET') {
     if (query.id) {
-      // 🔍 Fetch user by ID
       try {
         const result = await pool.query('SELECT * FROM users WHERE id = $1', [query.id]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
@@ -25,24 +24,29 @@ module.exports = async (req, res) => {
       }
     }
 
-    // ✅ Ping route to confirm API is live
     return res.status(200).json({ message: '✅ Auth API is live and reachable!' });
   }
 
   if (method === 'POST') {
-    // ✅ Register a new user
-    const { nickname, country, marketing_opt_in = false } = body;
-    if (!nickname || !country) {
-      return res.status(400).json({ error: 'Nickname and country are required.' });
+    const {
+      name,
+      email,
+      country,
+      avatar_url = null,
+      marketing_opt_in = false,
+    } = body;
+
+    if (!name || !email || !country) {
+      return res.status(400).json({ error: 'Name, email, and country are required.' });
     }
 
     try {
       const insertQuery = `
-        INSERT INTO users (nickname, country, marketing_opt_in)
-        VALUES ($1, $2, $3)
+        INSERT INTO users (name, email, country, avatar_url, marketing_opt_in)
+        VALUES ($1, $2, $3, $4, $5)
         RETURNING *
       `;
-      const values = [nickname, country, marketing_opt_in];
+      const values = [name, email, country, avatar_url, marketing_opt_in];
       const result = await pool.query(insertQuery, values);
       return res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -52,21 +56,31 @@ module.exports = async (req, res) => {
   }
 
   if (method === 'PUT') {
-    // ✅ Update user profile
-    const { id, nickname, country, avatar_url, marketing_opt_in } = body;
+    const {
+      id,
+      name,
+      email,
+      country,
+      avatar_url,
+      marketing_opt_in,
+      last_tip_index,
+    } = body;
+
     if (!id) return res.status(400).json({ error: 'User ID is required.' });
 
     try {
       const updateQuery = `
         UPDATE users SET
-          nickname = COALESCE($2, nickname),
-          country = COALESCE($3, country),
-          avatar_url = COALESCE($4, avatar_url),
-          marketing_opt_in = COALESCE($5, marketing_opt_in)
+          name = COALESCE($2, name),
+          email = COALESCE($3, email),
+          country = COALESCE($4, country),
+          avatar_url = COALESCE($5, avatar_url),
+          marketing_opt_in = COALESCE($6, marketing_opt_in),
+          last_tip_index = COALESCE($7, last_tip_index)
         WHERE id = $1
         RETURNING *
       `;
-      const values = [id, nickname, country, avatar_url, marketing_opt_in];
+      const values = [id, name, email, country, avatar_url, marketing_opt_in, last_tip_index];
       const result = await pool.query(updateQuery, values);
       return res.status(200).json(result.rows[0]);
     } catch (err) {
@@ -76,7 +90,6 @@ module.exports = async (req, res) => {
   }
 
   if (method === 'DELETE') {
-    // ❌ Delete user
     const { id } = query;
     if (!id) return res.status(400).json({ error: 'User ID is required.' });
 
