@@ -1,15 +1,13 @@
-const express = require('express');
 
-module.exports = (pool) => {
-  const router = express.Router();
+import { Pool } from 'pg';
 
-  console.log('📍 Locations route initialized');
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+});
 
-  /**
-   * 📍 GET /api/locations
-   * Returns all recycling locations sorted by region and name.
-   */
-  router.get('/locations', async (req, res) => {
+export default async function handler(req, res) {
+  if (req.method === 'GET') {
     try {
       const query = `
         SELECT id, name, address, region, latitude, longitude
@@ -23,7 +21,7 @@ module.exports = (pool) => {
       console.error('❌ Error fetching locations:', err.message);
       res.status(500).json({ success: false, error: 'Internal Server Error' });
     }
-  });
-
-  return router;
-};
+  } else {
+    res.status(405).json({ error: 'Method not allowed' });
+  }
+}
