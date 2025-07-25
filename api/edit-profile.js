@@ -11,11 +11,13 @@ export const config = {
   },
 };
 
+// Supabase client
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+// PostgreSQL pool
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
@@ -41,7 +43,13 @@ export default async function handler(req, res) {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      return res.status(200).json(result.rows[0]);
+      const user = result.rows[0];
+      const defaultAvatar = 'https://kqolfqxyiywlkintnoky.supabase.co/storage/v1/object/public/avatars/default.jpg';
+
+      return res.status(200).json({
+        ...user,
+        avatar_url: user.avatar_url || defaultAvatar,
+      });
     } catch (e) {
       console.error('❌ Error fetching user:', e);
       return res.status(500).json({ error: 'Internal server error' });
@@ -96,7 +104,7 @@ export default async function handler(req, res) {
           avatar_url = publicURL.publicUrl;
         }
 
-        // Normalize marketing_opt_in (optional)
+        // Normalize marketing_opt_in
         const marketingOpt = typeof marketing_opt_in === 'string'
           ? marketing_opt_in.toLowerCase() === 'true'
           : null;
