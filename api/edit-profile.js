@@ -5,20 +5,17 @@ import { Pool } from 'pg';
 import formidable from 'formidable';
 import fs from 'fs';
 
-// Disable Next.js default body parser (required for file uploads)
 export const config = {
   api: {
     bodyParser: false,
   },
 };
 
-// Supabase client
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// PostgreSQL pool
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
@@ -36,7 +33,7 @@ export default async function handler(req, res) {
 
     try {
       const result = await pool.query(
-        `SELECT id, name, country, avatar_url FROM users WHERE id = $1`,
+        `SELECT id, name, country, avatar_url, marketing_opt_in FROM users WHERE id = $1`,
         [user_id]
       );
 
@@ -63,6 +60,7 @@ export default async function handler(req, res) {
       const user_id = fields.user_id?.[0];
       const name = fields.name?.[0];
       const country = fields.country?.[0];
+      const marketing_opt_in = fields.marketing_opt_in?.[0];
       const file = files.avatar;
 
       if (!user_id) {
@@ -72,7 +70,7 @@ export default async function handler(req, res) {
       let avatar_url = null;
 
       try {
-        // === Upload avatar to Supabase Storage ===
+        // Upload avatar to Supabase Storage
         if (file && file[0] && file[0].filepath) {
           const fileData = file[0];
           const fileBuffer = fs.readFileSync(fileData.filepath);
@@ -98,17 +96,23 @@ export default async function handler(req, res) {
           avatar_url = publicURL.publicUrl;
         }
 
-        // === Update user info in PostgreSQL ===
+        // Normalize marketing_opt_in (optional)
+        const marketingOpt = typeof marketing_opt_in === 'string'
+          ? marketing_opt_in.toLowerCase() === 'true'
+          : null;
+
+        // Update user info
         const result = await pool.query(
           `
           UPDATE users
           SET name = COALESCE($2, name),
               country = COALESCE($3, country),
-              avatar_url = COALESCE($4, avatar_url)
+              avatar_url = COALESCE($4, avatar_url),
+              marketing_opt_in = COALESCE($5, marketing_opt_in)
           WHERE id = $1
-          RETURNING id, name, country, avatar_url
+          RETURNING id, name, country, avatar_url, marketing_opt_in
         `,
-          [user_id, name, country, avatar_url]
+          [user_id, name, country, avatar_url, marketingOpt]
         );
 
         return res.status(200).json(result.rows[0]);
