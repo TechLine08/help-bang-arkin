@@ -14,5 +14,7 @@
       "path": "/api/send-tips",
       "schedule": "0 8 * * *"
     }
-  ]
+  ],
+
+  "buildCommand": "node scripts/seedsAll.js"
 }
