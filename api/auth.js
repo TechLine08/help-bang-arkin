@@ -1,4 +1,4 @@
-// File: /api/auth.js (Vercel-compatible)
+// File: /api/auth.js (Vercel-compatible, Full CRUD + Fetch)
 
 const { Pool } = require('pg');
 
@@ -10,15 +10,28 @@ const pool = new Pool({
 });
 
 module.exports = async (req, res) => {
-  if (req.method === 'GET') {
+  const { method, query, body } = req;
+
+  if (method === 'GET') {
+    if (query.id) {
+      // 🔍 Fetch user by ID
+      try {
+        const result = await pool.query('SELECT * FROM users WHERE id = $1', [query.id]);
+        if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+        return res.status(200).json(result.rows[0]);
+      } catch (err) {
+        console.error('❌ Error fetching user by ID:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+    }
+
     // ✅ Ping route to confirm API is live
     return res.status(200).json({ message: '✅ Auth API is live and reachable!' });
   }
 
-  if (req.method === 'POST') {
+  if (method === 'POST') {
     // ✅ Register a new user
-    const { nickname, country, marketing_opt_in = false } = req.body;
-
+    const { nickname, country, marketing_opt_in = false } = body;
     if (!nickname || !country) {
       return res.status(400).json({ error: 'Nickname and country are required.' });
     }
@@ -38,10 +51,9 @@ module.exports = async (req, res) => {
     }
   }
 
-  if (req.method === 'PUT') {
-    // ✅ Update user profile (e.g. avatar, nickname, country)
-    const { id, nickname, country, avatar_url, marketing_opt_in } = req.body;
-
+  if (method === 'PUT') {
+    // ✅ Update user profile
+    const { id, nickname, country, avatar_url, marketing_opt_in } = body;
     if (!id) return res.status(400).json({ error: 'User ID is required.' });
 
     try {
@@ -63,6 +75,19 @@ module.exports = async (req, res) => {
     }
   }
 
-  // ❌ Method not allowed
+  if (method === 'DELETE') {
+    // ❌ Delete user
+    const { id } = query;
+    if (!id) return res.status(400).json({ error: 'User ID is required.' });
+
+    try {
+      await pool.query('DELETE FROM users WHERE id = $1', [id]);
+      return res.status(200).json({ message: 'User deleted successfully' });
+    } catch (err) {
+      console.error('❌ Error deleting user:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
   return res.status(405).json({ error: 'Method not allowed' });
 };

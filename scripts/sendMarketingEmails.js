@@ -1,4 +1,4 @@
-// backend/scripts/sendMarketingEmails.js
+// File: /scripts/sendMarketingEmails.js
 require('dotenv').config();
 const { Pool } = require('pg');
 const nodemailer = require('nodemailer');
@@ -6,9 +6,9 @@ const nodemailer = require('nodemailer');
 // DB Pool
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production'
-    ? { rejectUnauthorized: false }
-    : false,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
 // Daily Tips
@@ -23,7 +23,7 @@ const tips = [
   "🍃 Start composting food waste at home.",
 ];
 
-// Mailer
+// Mailer Transporter
 const transporter = nodemailer.createTransport({
   host: process.env.MAIL_HOST,
   port: process.env.MAIL_PORT,
@@ -33,6 +33,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Send a single email
 const sendEmail = async ({ to, subject, html }) => {
   try {
     await transporter.sendMail({
@@ -46,14 +47,15 @@ const sendEmail = async ({ to, subject, html }) => {
   }
 };
 
+// Main tip-sending logic
 const sendTips = async () => {
   const client = await pool.connect();
   try {
-    const { rows: users } = await client.query(
-      `SELECT id, name, email, last_tip_index
-       FROM users
-       WHERE marketing_opt_in = true`
-    );
+    const { rows: users } = await client.query(`
+      SELECT id, name, email, last_tip_index
+      FROM users
+      WHERE marketing_opt_in = true
+    `);
 
     if (!users.length) {
       console.log('ℹ️ No subscribed users to send tips.');
@@ -81,10 +83,7 @@ const sendTips = async () => {
       });
 
       const nextIndex = (index + 1) % tips.length;
-      await client.query(
-        `UPDATE users SET last_tip_index = $1 WHERE id = $2`,
-        [nextIndex, user.id]
-      );
+      await client.query(`UPDATE users SET last_tip_index = $1 WHERE id = $2`, [nextIndex, user.id]);
     }
 
     console.log(`✅ Sent eco tips to ${users.length} users.`);
@@ -96,10 +95,10 @@ const sendTips = async () => {
   }
 };
 
-// 👇 CLI Support
+// CLI support
 if (require.main === module) {
   sendTips();
 }
 
-// 👇 Vercel or import support
+// API support
 module.exports = { sendTips };

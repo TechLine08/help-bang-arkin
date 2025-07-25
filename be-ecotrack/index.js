@@ -27,7 +27,7 @@ try {
 }
 
 // 📧 Scheduled Email Service
-const { sendTips } = require('./scripts/sendMarketingEmails');
+const { sendTips } = require('../scripts/sendMarketingEmails');
 
 // 🚀 Initialize Express App
 const app = express();
