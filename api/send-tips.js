@@ -1,25 +1,29 @@
+// api/send-tips.js
+
 require('dotenv').config();
 
-console.log('✅ /api/send-tips endpoint loaded'); // ✅ Log startup
+console.log('✅ Loaded /api/send-tips endpoint');
 
 const { sendTips } = require('../backend/scripts/sendMarketingEmails');
 
 module.exports = async (req, res) => {
-  console.log('📨 Triggered /api/send-tips');
+  console.log('📨 /api/send-tips invoked');
 
   try {
-    await sendTips(); // ⛔ This might hang or crash silently
-    console.log('✅ Tips sent successfully');
+    await sendTips();
+
+    console.log('✅ sendTips() executed successfully');
 
     res.status(200).json({
       success: true,
       message: 'Marketing tips sent successfully',
     });
   } catch (err) {
-    console.error('❌ Failed to send tips:', err);
+    const message = err?.message || 'Unknown error in sendTips()';
+    console.error('❌ sendTips() failed:', message);
     res.status(500).json({
       success: false,
-      error: 'Failed to send marketing tips',
+      error: message,
     });
   }
 };
