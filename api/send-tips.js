@@ -4,7 +4,7 @@ require('dotenv').config();
 
 console.log('✅ Loaded /api/send-tips endpoint');
 
-const { sendTips } = require('../backend/scripts/sendMarketingEmails');
+const { sendTips } = require('../scripts/sendMarketingEmails'); // ⬅️ Updated import path
 
 module.exports = async (req, res) => {
   console.log('📨 /api/send-tips invoked');
