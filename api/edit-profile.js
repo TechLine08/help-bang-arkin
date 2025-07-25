@@ -5,25 +5,26 @@ import { Pool } from 'pg';
 import formidable from 'formidable';
 import fs from 'fs';
 
-// Vercel serverless config to disable default body parser
+// === Vercel serverless config to disable bodyParser ===
 export const config = {
   api: {
     bodyParser: false,
   },
 };
 
-// Initialize Supabase client
+// === Supabase Client ===
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// Initialize PostgreSQL pool
+// === PostgreSQL Pool ===
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
 
+// === Handler ===
 export default async function handler(req, res) {
   console.log('📥 Incoming request to /api/edit-profile');
 
@@ -31,6 +32,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Setup formidable for file parsing
   const form = new formidable.IncomingForm({ keepExtensions: true });
 
   form.parse(req, async (err, fields, files) => {
@@ -39,8 +41,8 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid form data' });
     }
 
-    console.log('📦 Parsed fields:', fields);
-    console.log('🖼️ Parsed files:', files);
+    console.log('📦 Fields:', fields);
+    console.log('🖼️ Files:', files);
 
     const user_id = fields.user_id?.[0];
     const name = fields.name?.[0];
@@ -48,21 +50,20 @@ export default async function handler(req, res) {
     const file = files.avatar;
 
     if (!user_id) {
-      console.error('❌ Missing user_id');
       return res.status(400).json({ error: 'Missing user_id' });
     }
 
     let avatar_url = null;
 
     try {
-      // === Upload image to Supabase if exists ===
-      if (file && file[0] && file[0].filepath) {
+      // === Upload to Supabase if file exists ===
+      if (file && file[0]?.filepath) {
         const fileData = file[0];
         const fileBuffer = fs.readFileSync(fileData.filepath);
         const fileExt = fileData.originalFilename.split('.').pop();
         const filePath = `avatars/${user_id}.${fileExt}`;
 
-        console.log('📤 Uploading to Supabase:', filePath);
+        console.log('📤 Uploading file to Supabase:', filePath);
 
         const { error: uploadError } = await supabase.storage
           .from('avatars')
@@ -81,26 +82,26 @@ export default async function handler(req, res) {
           .getPublicUrl(filePath);
 
         avatar_url = publicURL.publicUrl;
-        console.log('✅ Avatar uploaded:', avatar_url);
+        console.log('✅ Uploaded avatar URL:', avatar_url);
       }
 
-      // === Update user in PostgreSQL ===
-      const result = await pool.query(
-        `
+      // === Update user in DB ===
+      const query = `
         UPDATE users
         SET name = COALESCE($2, name),
             country = COALESCE($3, country),
             avatar_url = COALESCE($4, avatar_url)
         WHERE id = $1
         RETURNING *;
-      `,
-        [user_id, name, country, avatar_url]
-      );
+      `;
 
-      console.log('✅ User updated:', result.rows[0]);
+      const values = [user_id, name, country, avatar_url];
+      const result = await pool.query(query, values);
+
+      console.log('✅ Updated user:', result.rows[0]);
       return res.status(200).json(result.rows[0]);
     } catch (e) {
-      console.error('❌ Internal error during profile update:', e);
+      console.error('❌ Error updating profile:', e);
       return res.status(500).json({ error: 'Internal server error' });
     }
   });

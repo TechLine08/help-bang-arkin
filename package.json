@@ -1,28 +1,27 @@
 {
-  "name": "be-ecotrack",
+  "name": "helep-for-bang-arkin",
   "version": "1.0.0",
-  "description": "Backend API for EcoTrack project",
+  "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [
-    "ecotrack",
-    "express",
-    "postgresql",
-    "backend"
-  ],
-  "author": "Vincent Gavriel Julijanto",
-  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TechLine08/help-bang-arkin.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
   "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/TechLine08/help-bang-arkin/issues"
+  },
+  "homepage": "https://github.com/TechLine08/help-bang-arkin#readme",
   "dependencies": {
-    "bcrypt": "^6.0.0",
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.0",
-    "express": "^5.1.0",
-    "node-cron": "^4.2.1",
-    "nodemailer": "^7.0.5",
-    "pg": "^8.16.3",
-    "uuid": "^11.1.0"
+    "@supabase/supabase-js": "^2.52.1",
+    "dotenv": "^17.2.1",
+    "formidable": "^3.5.4",
+    "pg": "^8.16.3"
   }
 }
