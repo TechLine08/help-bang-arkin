@@ -19,9 +19,9 @@ export default function Home() {
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
 
-  const fetchLogs = async (email) => {
+  const fetchLogs = async (uid) => {
     try {
-      const res = await fetch(getApiUrl(`api/recycling-logs?email=${email}`));
+      const res = await fetch(getApiUrl(`api/progress?user_id=${uid}`));
       const data = await res.json();
       setLogs(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -73,7 +73,7 @@ export default function Home() {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
-        await fetchLogs(firebaseUser.email);
+        await fetchLogs(firebaseUser.uid);
         await fetchLeaderboard();
       } else {
         setUser(null);
@@ -88,13 +88,15 @@ export default function Home() {
     if (!user || !wasteType.trim() || !quantity) return;
 
     try {
-      const res = await fetch(getApiUrl('api/recycling-logs'), {
+      const res = await fetch(getApiUrl('api/progress'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: user.email,
-          waste_type: wasteType.trim(),
-          quantity: Number(quantity),
+          user_id: user.uid,
+          location_id: 'dummy-location', // TODO: Replace with actual location ID
+          material_type: wasteType.trim(),
+          bottle_count: Number(quantity),
+          weight_kg: 0.5, // dummy default, update if you collect this
         }),
       });
 
@@ -103,7 +105,7 @@ export default function Home() {
       setWasteType('');
       setQuantity('');
       showToast('Activity logged!', 'success');
-      fetchLogs(user.email);
+      fetchLogs(user.uid);
     } catch (err) {
       console.error('❌ Submission failed:', err);
       showToast('Submission failed. Please try again.', 'error');
@@ -111,7 +113,7 @@ export default function Home() {
   };
 
   const wasteCounts = logs.reduce((acc, log) => {
-    acc[log.waste_type] = (acc[log.waste_type] || 0) + log.quantity;
+    acc[log.material_type] = (acc[log.material_type] || 0) + (log.bottle_count || 0);
     return acc;
   }, {});
 
@@ -258,11 +260,11 @@ export default function Home() {
               {logs.map((log, idx) => (
                 <li key={idx} className="py-3">
                   <div className="flex justify-between">
-                    <span className="text-gray-800">{log.waste_type}</span>
-                    <span className="text-gray-500">{log.quantity} item(s)</span>
+                    <span className="text-gray-800">{log.material_type}</span>
+                    <span className="text-gray-500">{log.bottle_count} item(s)</span>
                   </div>
                   <div className="text-sm text-gray-400">
-                    {new Date(log.timestamp).toLocaleString()}
+                    {new Date(log.recycled_at).toLocaleString()}
                   </div>
                 </li>
               ))}
