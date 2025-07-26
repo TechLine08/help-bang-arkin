@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import Toast from '../components/Toast';
+import { getApiUrl } from '../config/api';
 
 export default function Contact() {
   const [form, setForm] = useState({ name: '', email: '', message: '' });
@@ -19,7 +20,7 @@ export default function Contact() {
     }
 
     try {
-      const res = await fetch('http://localhost:5050/api/contact', {
+      const res = await fetch(getApiUrl('api/contact'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),

@@ -5,6 +5,7 @@ import Header from '../components/Header';
 import Toast from '../components/Toast';
 import { Pie } from 'react-chartjs-2';
 import { Chart, ArcElement, Tooltip, Legend } from 'chart.js';
+import { getApiUrl } from '../config/api';
 
 Chart.register(ArcElement, Tooltip, Legend);
 
@@ -15,12 +16,16 @@ export default function Home() {
   const [wasteType, setWasteType] = useState('');
   const [quantity, setQuantity] = useState('');
   const [toast, setToast] = useState(null);
+  const [leaderboardType, setLeaderboardType] = useState('users'); // 'users' or 'countries'
+  const [leaderboardData, setLeaderboardData] = useState([]);
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
         fetchLogs(firebaseUser.email);
+        fetchLeaderboard('users'); // Load initial leaderboard
       } else {
         setUser(null);
         setLoading(false);
@@ -31,7 +36,7 @@ export default function Home() {
 
   const fetchLogs = async (email) => {
     try {
-      const res = await fetch(`http://localhost:5050/api/recycling-logs?email=${email}`);
+      const res = await fetch(getApiUrl(`api/recycling-logs?email=${email}`));
       const data = await res.json();
       if (Array.isArray(data)) {
         setLogs(data);
@@ -52,7 +57,7 @@ export default function Home() {
     if (!user || !wasteType.trim() || !quantity) return;
 
     try {
-      const res = await fetch('http://localhost:5050/api/recycling-logs', {
+      const res = await fetch(getApiUrl('api/recycling-logs'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -77,6 +82,32 @@ export default function Home() {
   const showToast = (message, type) => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
+  };
+
+  const fetchLeaderboard = async (type) => {
+    setLoadingLeaderboard(true);
+    try {
+      const endpoint = type === 'users' ? 'leaderboard/users' : 'leaderboard/countries';
+      const res = await fetch(getApiUrl(endpoint));
+      const data = await res.json();
+      
+      if (data.success) {
+        setLeaderboardData(data.data);
+      } else {
+        console.error('Failed to fetch leaderboard:', data.error);
+        showToast('Failed to load leaderboard', 'error');
+      }
+    } catch (err) {
+      console.error('❌ Failed to fetch leaderboard:', err);
+      showToast('Failed to load leaderboard', 'error');
+    } finally {
+      setLoadingLeaderboard(false);
+    }
+  };
+
+  const handleLeaderboardToggle = (type) => {
+    setLeaderboardType(type);
+    fetchLeaderboard(type);
   };
 
   // 🧁 Pie Chart Data
@@ -169,6 +200,76 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {/* Leaderboard */}
+        <div className="bg-white shadow-md rounded-lg p-6 mb-10">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-green-600">
+              🏆 Leaderboard
+            </h2>
+            <div className="flex bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => handleLeaderboardToggle('users')}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition ${
+                  leaderboardType === 'users'
+                    ? 'bg-green-600 text-white'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                🧑‍🤝‍🧑 Users
+              </button>
+              <button
+                onClick={() => handleLeaderboardToggle('countries')}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition ${
+                  leaderboardType === 'countries'
+                    ? 'bg-green-600 text-white'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                🌍 Countries
+              </button>
+            </div>
+          </div>
+
+          {loadingLeaderboard ? (
+            <div className="text-center py-8">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+              <p className="mt-2 text-gray-600">Loading leaderboard...</p>
+            </div>
+          ) : leaderboardData.length === 0 ? (
+            <p className="text-gray-600 text-center py-8">No leaderboard data available yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {leaderboardData.map((item, index) => (
+                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm ${
+                      index === 0 ? 'bg-yellow-500' : 
+                      index === 1 ? 'bg-gray-400' : 
+                      index === 2 ? 'bg-amber-600' : 'bg-green-600'
+                    }`}>
+                      {index + 1}
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-800">
+                        {leaderboardType === 'users' ? item.name : item.country}
+                      </p>
+                      {leaderboardType === 'users' && item.country && (
+                        <p className="text-sm text-gray-500">{item.country}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-green-600">
+                      {item.total_recycled.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-gray-500">items recycled</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Logs */}
         <div className="bg-white shadow-md rounded-lg p-6">

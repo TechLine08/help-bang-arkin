@@ -4,6 +4,7 @@ import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, sign
 import { auth } from '../firebase';
 import Header from '../components/Header';
 import Toast from '../components/Toast';
+import { getApiUrl } from '../config/api';
 
 export default function Signup() {
   const [name, setName] = useState('');
@@ -44,7 +45,7 @@ export default function Signup() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(userCredential.user, { displayName: name });
 
-      await fetch('/api/users', {
+      await fetch(getApiUrl('api/users'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, marketing_opt_in: marketingOptIn }),
@@ -64,7 +65,7 @@ export default function Signup() {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
-      await fetch('/api/users', {
+      await fetch(getApiUrl('api/users'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: user.displayName, email: user.email, marketing_opt_in: true }),
