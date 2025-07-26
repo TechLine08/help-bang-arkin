@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../firebase';
 import Header from '../components/Header';
@@ -23,10 +23,10 @@ export default function ForgotPassword() {
     } catch (error) {
       const friendly =
         error.code === 'auth/user-not-found'
-          ? "No account found with this email."
+          ? 'No account found with this email.'
           : error.code === 'auth/invalid-email'
-          ? "Invalid email address."
-          : "Something went wrong.";
+          ? 'Invalid email address.'
+          : 'Something went wrong.';
       showToast(friendly);
     }
   };
