@@ -1,5 +1,3 @@
-// File: /api/progress.js
-
 require('dotenv').config();
 const { Pool } = require('pg');
 const { v4: uuidv4 } = require('uuid');
@@ -11,14 +9,14 @@ try {
     ssl: { rejectUnauthorized: false },
   });
 } catch (err) {
-  console.error('❌ Failed to connect to DB:', err);
+  console.error('❌ DB connection init failed:', err);
 }
 
 module.exports = async (req, res) => {
   const method = req.method;
   console.log(`📡 /api/progress triggered with method: ${method}`);
 
-  // CORS headers
+  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -32,23 +30,19 @@ module.exports = async (req, res) => {
 
         let result;
         if (user_id) {
-          const query = `
-            SELECT *
-            FROM recycling_logs
+          result = await pool.query(`
+            SELECT * FROM recycling_logs
             WHERE user_id = $1
             ORDER BY recycled_at DESC
-          `;
-          result = await pool.query(query, [user_id]);
+          `, [user_id]);
         } else {
-          const query = `
-            SELECT *
-            FROM recycling_logs
+          result = await pool.query(`
+            SELECT * FROM recycling_logs
             ORDER BY recycled_at DESC
-          `;
-          result = await pool.query(query);
+          `);
         }
 
-        console.log('📤 Returning logs:', result.rows.length);
+        console.log('📤 Fetched rows:', result.rows.length);
         return res.status(200).json(result.rows);
       }
 
@@ -63,17 +57,7 @@ module.exports = async (req, res) => {
           photo_url = null,
         } = req.body;
 
-        console.log('➕ POST new recycling entry:', {
-          user_id,
-          location_id,
-          material_type,
-          bottle_count,
-          weight_kg,
-          points_awarded,
-        });
-
         if (!user_id || !location_id || bottle_count == null || weight_kg == null) {
-          console.warn('⚠️ Missing required fields');
           return res.status(400).json({ error: 'Missing required fields' });
         }
 
@@ -98,7 +82,6 @@ module.exports = async (req, res) => {
           ]
         );
 
-        console.log('✅ Log inserted:', result.rows[0]);
         return res.status(201).json(result.rows[0]);
       }
 
@@ -106,17 +89,18 @@ module.exports = async (req, res) => {
         const { id } = req.query;
         if (!id) return res.status(400).json({ error: 'Missing recycling log ID' });
 
-        console.log(`🗑️ DELETE recycling log with id: ${id}`);
         await pool.query('DELETE FROM recycling_logs WHERE id = $1', [id]);
-        return res.status(200).json({ success: true, message: 'Recycling log deleted' });
+        return res.status(200).json({ success: true });
       }
 
       default:
-        console.warn('❌ Unsupported method');
         return res.status(405).json({ error: 'Method not allowed' });
     }
   } catch (err) {
-    console.error('❌ Error in /api/progress:', err.stack || err.message || err);
-    return res.status(500).json({ error: 'Internal server error', details: err.message });
+    console.error('❌ API /progress error:', err.stack || err.message || err);
+    return res.status(500).json({
+      error: 'Internal server error',
+      debug: err.message || err,
+    });
   }
 };
