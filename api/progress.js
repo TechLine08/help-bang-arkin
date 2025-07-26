@@ -4,28 +4,25 @@ require('dotenv').config();
 const { Pool } = require('pg');
 const { v4: uuidv4 } = require('uuid');
 
-// === DB connection ===
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-  },
-});
+let pool;
+try {
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+  });
+} catch (err) {
+  console.error('❌ Failed to connect to DB:', err);
+}
 
-// === API handler ===
 module.exports = async (req, res) => {
-  // 🔒 CORS headers
+  const method = req.method;
+  console.log(`📡 /api/progress triggered with method: ${method}`);
+
+  // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  // 🔁 Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  const method = req.method;
-  console.log(`📡 /api/progress triggered with method: ${method}`);
+  if (method === 'OPTIONS') return res.status(200).end();
 
   try {
     switch (method) {
@@ -33,7 +30,7 @@ module.exports = async (req, res) => {
         const { user_id } = req.query;
         console.log('🔍 GET progress', user_id ? `for user_id: ${user_id}` : 'for all users');
 
-        const query = `
+        const baseQuery = `
           SELECT *
           FROM recycling_logs
           ${user_id ? 'WHERE user_id = $1' : ''}
@@ -41,9 +38,10 @@ module.exports = async (req, res) => {
         `;
 
         const result = user_id
-          ? await pool.query(query, [user_id])
-          : await pool.query(query);
+          ? await pool.query(baseQuery, [user_id])
+          : await pool.query(baseQuery);
 
+        console.log('📤 Returning logs:', result.rows.length);
         return res.status(200).json(result.rows);
       }
 
@@ -58,7 +56,7 @@ module.exports = async (req, res) => {
           photo_url = null,
         } = req.body;
 
-        console.log('➕ POST recycling entry:', {
+        console.log('➕ POST new recycling entry:', {
           user_id,
           location_id,
           material_type,
@@ -68,30 +66,32 @@ module.exports = async (req, res) => {
         });
 
         if (!user_id || !location_id || bottle_count == null || weight_kg == null) {
+          console.warn('⚠️ Missing required fields');
           return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        const insertQuery = `
+        const result = await pool.query(
+          `
           INSERT INTO recycling_logs (
             id, user_id, location_id, material_type,
             bottle_count, weight_kg, points_awarded,
             photo_url, recycled_at
           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
           RETURNING *
-        `;
+          `,
+          [
+            uuidv4(),
+            user_id,
+            location_id,
+            material_type,
+            bottle_count,
+            weight_kg,
+            points_awarded,
+            photo_url,
+          ]
+        );
 
-        const result = await pool.query(insertQuery, [
-          uuidv4(),
-          user_id,
-          location_id,
-          material_type,
-          bottle_count,
-          weight_kg,
-          points_awarded,
-          photo_url,
-        ]);
-
-        console.log('✅ Entry added:', result.rows[0]);
+        console.log('✅ Log inserted:', result.rows[0]);
         return res.status(201).json(result.rows[0]);
       }
 
@@ -105,10 +105,11 @@ module.exports = async (req, res) => {
       }
 
       default:
+        console.warn('❌ Unsupported method');
         return res.status(405).json({ error: 'Method not allowed' });
     }
   } catch (err) {
     console.error('❌ Error in /api/progress:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 };
