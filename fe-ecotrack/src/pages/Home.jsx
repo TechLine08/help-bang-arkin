@@ -16,32 +16,45 @@ export default function Home() {
   const [wasteType, setWasteType] = useState('');
   const [quantity, setQuantity] = useState('');
   const [toast, setToast] = useState(null);
-  const [leaderboardType, setLeaderboardType] = useState('users'); // 'users' or 'countries'
+  const [leaderboardType, setLeaderboardType] = useState('users');
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser);
-        fetchLogs(firebaseUser.email);
-        fetchLeaderboard('users'); // Load initial leaderboard
-      } else {
-        setUser(null);
-        setLoading(false);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
+  // 🥇 Fetch leaderboard
+  const fetchLeaderboard = async (type) => {
+    setLoadingLeaderboard(true);
+    console.log(`📊 Fetching leaderboard: ${type}`);
+    try {
+      const endpoint = type === 'users' ? 'leaderboard/users' : 'leaderboard/countries';
+      const res = await fetch(getApiUrl(endpoint));
+      const data = await res.json();
+      console.log('✅ Leaderboard response:', data);
 
+      if (data.success) {
+        setLeaderboardData(data.data);
+      } else {
+        console.error('❌ Leaderboard error:', data.error);
+        showToast('Failed to load leaderboard', 'error');
+      }
+    } catch (err) {
+      console.error('❌ Failed to fetch leaderboard:', err);
+      showToast('Failed to load leaderboard', 'error');
+    } finally {
+      setLoadingLeaderboard(false);
+    }
+  };
+
+  // 📜 Fetch logs
   const fetchLogs = async (email) => {
+    console.log(`📜 Fetching logs for: ${email}`);
     try {
       const res = await fetch(getApiUrl(`api/recycling-logs?email=${email}`));
       const data = await res.json();
+      console.log('✅ Logs:', data);
       if (Array.isArray(data)) {
         setLogs(data);
       } else {
-        console.warn('Logs format:', data);
+        console.warn('⚠️ Unexpected logs format:', data);
         setLogs([]);
       }
     } catch (err) {
@@ -51,9 +64,33 @@ export default function Home() {
     }
   };
 
+  // 🔐 Check auth + preload
+  useEffect(() => {
+    console.log('🔐 Checking auth state...');
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        console.log('✅ Authenticated as:', firebaseUser.email);
+        setUser(firebaseUser);
+        fetchLogs(firebaseUser.email);
+        fetchLeaderboard('users');
+      } else {
+        console.log('👋 No user logged in');
+        setUser(null);
+        setLoading(false);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // ✉️ Toast handler
+  const showToast = (message, type) => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  // 🚀 Submit log
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!user || !wasteType.trim() || !quantity) return;
 
     try {
@@ -79,38 +116,12 @@ export default function Home() {
     }
   };
 
-  const showToast = (message, type) => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
-
-  const fetchLeaderboard = async (type) => {
-    setLoadingLeaderboard(true);
-    try {
-      const endpoint = type === 'users' ? 'leaderboard/users' : 'leaderboard/countries';
-      const res = await fetch(getApiUrl(endpoint));
-      const data = await res.json();
-      
-      if (data.success) {
-        setLeaderboardData(data.data);
-      } else {
-        console.error('Failed to fetch leaderboard:', data.error);
-        showToast('Failed to load leaderboard', 'error');
-      }
-    } catch (err) {
-      console.error('❌ Failed to fetch leaderboard:', err);
-      showToast('Failed to load leaderboard', 'error');
-    } finally {
-      setLoadingLeaderboard(false);
-    }
-  };
-
   const handleLeaderboardToggle = (type) => {
     setLeaderboardType(type);
     fetchLeaderboard(type);
   };
 
-  // 🧁 Pie Chart Data
+  // 🧁 Pie chart data
   const wasteCounts = logs.reduce((acc, log) => {
     acc[log.waste_type] = (acc[log.waste_type] || 0) + log.quantity;
     return acc;
@@ -145,7 +156,7 @@ export default function Home() {
           Welcome, {user?.displayName || user?.email} 👋
         </h1>
 
-        {/* Log Activity */}
+        {/* 🗑 Log form */}
         <div className="bg-white shadow-md rounded-lg p-6 mb-10">
           <h2 className="text-xl font-semibold text-green-600 mb-4">
             Log Recycling Activity
@@ -189,7 +200,7 @@ export default function Home() {
           </form>
         </div>
 
-        {/* Pie Chart */}
+        {/* 🍰 Chart */}
         {logs.length > 0 && (
           <div className="bg-white shadow-md rounded-lg p-6 mb-10">
             <h2 className="text-xl font-semibold text-green-600 mb-4 text-center">
@@ -201,7 +212,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* Leaderboard */}
+        {/* 🏆 Leaderboard */}
         <div className="bg-white shadow-md rounded-lg p-6 mb-10">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-green-600">
@@ -271,7 +282,7 @@ export default function Home() {
           )}
         </div>
 
-        {/* Logs */}
+        {/* 📦 Logs */}
         <div className="bg-white shadow-md rounded-lg p-6">
           <h2 className="text-xl font-semibold text-green-600 mb-4">
             Your Recycling Logs
