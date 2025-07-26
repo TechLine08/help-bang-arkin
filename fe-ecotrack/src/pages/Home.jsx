@@ -64,7 +64,7 @@ export default function Home() {
       }
     });
     return () => unsubscribe();
-  }, [fetchLeaderboardgit ]);
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
