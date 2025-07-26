@@ -42,7 +42,13 @@ export default function Home() {
     try {
       const endpoint = type === 'users' ? 'leaderboard/users' : 'leaderboard/countries';
       const res = await fetch(getApiUrl(endpoint));
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+
       const data = await res.json();
+      console.log('📊 Leaderboard API response:', data);
 
       const leaderboard = Array.isArray(data)
         ? data
@@ -50,19 +56,21 @@ export default function Home() {
         ? data.data
         : [];
 
-      setLeaderboardData(leaderboard);
-
-      if (!leaderboard.length) {
-        console.warn('⚠️ Leaderboard is empty or not properly structured');
+      if (leaderboard.length === 0) {
+        console.warn('⚠️ Leaderboard empty or invalid structure');
         showToast('No leaderboard data found.', 'info');
       }
+
+      setLeaderboardData(leaderboard);
     } catch (err) {
       console.error('❌ Failed to fetch leaderboard:', err);
-      showToast('Failed to load leaderboard', 'error');
+      showToast(`Failed to load leaderboard: ${err.message}`, 'error');
+      setLeaderboardData([]); // fallback to avoid stuck state
     } finally {
       setLoadingLeaderboard(false);
     }
   }, []);
+
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
