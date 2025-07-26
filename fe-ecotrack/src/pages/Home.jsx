@@ -43,11 +43,18 @@ export default function Home() {
       const endpoint = type === 'users' ? 'leaderboard/users' : 'leaderboard/countries';
       const res = await fetch(getApiUrl(endpoint));
       const data = await res.json();
-      if (data.success) {
-        setLeaderboardData(data.data);
-      } else {
-        console.error('❌ Leaderboard fetch error:', data.error);
-        showToast('Failed to load leaderboard', 'error');
+
+      const leaderboard = Array.isArray(data)
+        ? data
+        : data?.success && Array.isArray(data.data)
+        ? data.data
+        : [];
+
+      setLeaderboardData(leaderboard);
+
+      if (!leaderboard.length) {
+        console.warn('⚠️ Leaderboard is empty or not properly structured');
+        showToast('No leaderboard data found.', 'info');
       }
     } catch (err) {
       console.error('❌ Failed to fetch leaderboard:', err);
@@ -255,7 +262,7 @@ export default function Home() {
                   </div>
                   <div className="text-right">
                     <p className="font-semibold text-green-600">
-                      {item.total_recycled.toLocaleString()}
+                      {(item.total_recycled || item.total_bottles || 0).toLocaleString()}
                     </p>
                     <p className="text-xs text-gray-500">items recycled</p>
                   </div>
