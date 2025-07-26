@@ -30,16 +30,23 @@ module.exports = async (req, res) => {
         const { user_id } = req.query;
         console.log('🔍 GET progress', user_id ? `for user_id: ${user_id}` : 'for all users');
 
-        const baseQuery = `
-          SELECT *
-          FROM recycling_logs
-          ${user_id ? 'WHERE user_id = $1' : ''}
-          ORDER BY recycled_at DESC
-        `;
-
-        const result = user_id
-          ? await pool.query(baseQuery, [user_id])
-          : await pool.query(baseQuery);
+        let result;
+        if (user_id) {
+          const query = `
+            SELECT *
+            FROM recycling_logs
+            WHERE user_id = $1
+            ORDER BY recycled_at DESC
+          `;
+          result = await pool.query(query, [user_id]);
+        } else {
+          const query = `
+            SELECT *
+            FROM recycling_logs
+            ORDER BY recycled_at DESC
+          `;
+          result = await pool.query(query);
+        }
 
         console.log('📤 Returning logs:', result.rows.length);
         return res.status(200).json(result.rows);
@@ -109,7 +116,7 @@ module.exports = async (req, res) => {
         return res.status(405).json({ error: 'Method not allowed' });
     }
   } catch (err) {
-    console.error('❌ Error in /api/progress:', err);
+    console.error('❌ Error in /api/progress:', err.stack || err.message || err);
     return res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 };
