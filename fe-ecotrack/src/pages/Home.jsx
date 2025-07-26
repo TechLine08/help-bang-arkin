@@ -16,7 +16,7 @@ export default function Home() {
   const [wasteType, setWasteType] = useState('');
   const [quantity, setQuantity] = useState('');
   const [toast, setToast] = useState(null);
-  const [leaderboardType, setLeaderboardType] = useState('users');
+  const [leaderboardType, setLeaderboardType] = useState('users'); // 'users' or 'countries'
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
 
@@ -25,22 +25,25 @@ export default function Home() {
       if (firebaseUser) {
         setUser(firebaseUser);
         fetchLogs(firebaseUser.email);
-        fetchLeaderboard('users');
+        fetchLeaderboard('users'); // Load initial leaderboard
       } else {
         setUser(null);
         setLoading(false);
       }
     });
-
     return () => unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchLogs = async (email) => {
     try {
       const res = await fetch(getApiUrl(`api/recycling-logs?email=${email}`));
       const data = await res.json();
-      setLogs(Array.isArray(data) ? data : []);
+      if (Array.isArray(data)) {
+        setLogs(data);
+      } else {
+        console.warn('Logs format:', data);
+        setLogs([]);
+      }
     } catch (err) {
       console.error('❌ Failed to fetch logs:', err);
     } finally {
@@ -50,6 +53,7 @@ export default function Home() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     if (!user || !wasteType.trim() || !quantity) return;
 
     try {
@@ -86,14 +90,15 @@ export default function Home() {
       const endpoint = type === 'users' ? 'leaderboard/users' : 'leaderboard/countries';
       const res = await fetch(getApiUrl(endpoint));
       const data = await res.json();
+      
       if (data.success) {
         setLeaderboardData(data.data);
       } else {
-        console.error('⚠️ Failed to fetch leaderboard:', data.error);
+        console.error('Failed to fetch leaderboard:', data.error);
         showToast('Failed to load leaderboard', 'error');
       }
     } catch (err) {
-      console.error('❌ Leaderboard fetch failed:', err);
+      console.error('❌ Failed to fetch leaderboard:', err);
       showToast('Failed to load leaderboard', 'error');
     } finally {
       setLoadingLeaderboard(false);
@@ -105,7 +110,7 @@ export default function Home() {
     fetchLeaderboard(type);
   };
 
-  // Chart Data
+  // 🧁 Pie Chart Data
   const wasteCounts = logs.reduce((acc, log) => {
     acc[log.waste_type] = (acc[log.waste_type] || 0) + log.quantity;
     return acc;
@@ -134,6 +139,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white">
       <Header />
+
       <div className="max-w-2xl mx-auto px-4 pt-32 pb-20">
         <h1 className="text-3xl font-bold text-green-700 mb-6 text-center">
           Welcome, {user?.displayName || user?.email} 👋
@@ -141,10 +147,14 @@ export default function Home() {
 
         {/* Log Activity */}
         <div className="bg-white shadow-md rounded-lg p-6 mb-10">
-          <h2 className="text-xl font-semibold text-green-600 mb-4">Log Recycling Activity</h2>
+          <h2 className="text-xl font-semibold text-green-600 mb-4">
+            Log Recycling Activity
+          </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="wasteType" className="block text-sm font-medium mb-1">Waste Type</label>
+              <label htmlFor="wasteType" className="block text-sm font-medium mb-1">
+                Waste Type
+              </label>
               <input
                 id="wasteType"
                 type="text"
@@ -156,7 +166,9 @@ export default function Home() {
             </div>
 
             <div>
-              <label htmlFor="quantity" className="block text-sm font-medium mb-1">Quantity</label>
+              <label htmlFor="quantity" className="block text-sm font-medium mb-1">
+                Quantity
+              </label>
               <input
                 id="quantity"
                 type="number"
@@ -180,7 +192,9 @@ export default function Home() {
         {/* Pie Chart */}
         {logs.length > 0 && (
           <div className="bg-white shadow-md rounded-lg p-6 mb-10">
-            <h2 className="text-xl font-semibold text-green-600 mb-4 text-center">Recycling Breakdown</h2>
+            <h2 className="text-xl font-semibold text-green-600 mb-4 text-center">
+              Recycling Breakdown
+            </h2>
             <div className="w-64 mx-auto">
               <Pie data={chartData} />
             </div>
@@ -190,12 +204,16 @@ export default function Home() {
         {/* Leaderboard */}
         <div className="bg-white shadow-md rounded-lg p-6 mb-10">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-green-600">🏆 Leaderboard</h2>
+            <h2 className="text-xl font-semibold text-green-600">
+              🏆 Leaderboard
+            </h2>
             <div className="flex bg-gray-100 rounded-lg p-1">
               <button
                 onClick={() => handleLeaderboardToggle('users')}
                 className={`px-3 py-1 rounded-md text-sm font-medium transition ${
-                  leaderboardType === 'users' ? 'bg-green-600 text-white' : 'text-gray-600 hover:text-gray-800'
+                  leaderboardType === 'users'
+                    ? 'bg-green-600 text-white'
+                    : 'text-gray-600 hover:text-gray-800'
                 }`}
               >
                 🧑‍🤝‍🧑 Users
@@ -203,7 +221,9 @@ export default function Home() {
               <button
                 onClick={() => handleLeaderboardToggle('countries')}
                 className={`px-3 py-1 rounded-md text-sm font-medium transition ${
-                  leaderboardType === 'countries' ? 'bg-green-600 text-white' : 'text-gray-600 hover:text-gray-800'
+                  leaderboardType === 'countries'
+                    ? 'bg-green-600 text-white'
+                    : 'text-gray-600 hover:text-gray-800'
                 }`}
               >
                 🌍 Countries
@@ -213,7 +233,7 @@ export default function Home() {
 
           {loadingLeaderboard ? (
             <div className="text-center py-8">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-600" />
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
               <p className="mt-2 text-gray-600">Loading leaderboard...</p>
             </div>
           ) : leaderboardData.length === 0 ? (
@@ -224,8 +244,8 @@ export default function Home() {
                 <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm ${
-                      index === 0 ? 'bg-yellow-500' :
-                      index === 1 ? 'bg-gray-400' :
+                      index === 0 ? 'bg-yellow-500' : 
+                      index === 1 ? 'bg-gray-400' : 
                       index === 2 ? 'bg-amber-600' : 'bg-green-600'
                     }`}>
                       {index + 1}
@@ -241,7 +261,7 @@ export default function Home() {
                   </div>
                   <div className="text-right">
                     <p className="font-semibold text-green-600">
-                      {Number(item.total_recycled).toLocaleString()}
+                      {item.total_recycled.toLocaleString()}
                     </p>
                     <p className="text-xs text-gray-500">items recycled</p>
                   </div>
@@ -253,7 +273,9 @@ export default function Home() {
 
         {/* Logs */}
         <div className="bg-white shadow-md rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-green-600 mb-4">Your Recycling Logs</h2>
+          <h2 className="text-xl font-semibold text-green-600 mb-4">
+            Your Recycling Logs
+          </h2>
           {logs.length === 0 ? (
             <p className="text-gray-600">No logs yet. Start tracking your impact!</p>
           ) : (
