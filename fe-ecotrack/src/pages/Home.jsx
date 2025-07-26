@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase';
 import Header from '../components/Header';
@@ -32,7 +32,12 @@ export default function Home() {
     }
   };
 
-  const fetchLeaderboard = async (type) => {
+  const showToast = (message, type) => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const fetchLeaderboard = useCallback(async (type) => {
     setLoadingLeaderboard(true);
     try {
       const endpoint = type === 'users' ? 'leaderboard/users' : 'leaderboard/countries';
@@ -50,7 +55,7 @@ export default function Home() {
     } finally {
       setLoadingLeaderboard(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -64,7 +69,7 @@ export default function Home() {
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [fetchLeaderboard]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -91,11 +96,6 @@ export default function Home() {
       console.error('❌ Submission failed:', err);
       showToast('Submission failed. Please try again.', 'error');
     }
-  };
-
-  const showToast = (message, type) => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
   };
 
   const handleLeaderboardToggle = (type) => {
@@ -138,9 +138,7 @@ export default function Home() {
 
         {/* Log Activity */}
         <div className="bg-white shadow-md rounded-lg p-6 mb-10">
-          <h2 className="text-xl font-semibold text-green-600 mb-4">
-            Log Recycling Activity
-          </h2>
+          <h2 className="text-xl font-semibold text-green-600 mb-4">Log Recycling Activity</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="wasteType" className="block text-sm font-medium mb-1">
@@ -269,9 +267,7 @@ export default function Home() {
 
         {/* Logs */}
         <div className="bg-white shadow-md rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-green-600 mb-4">
-            Your Recycling Logs
-          </h2>
+          <h2 className="text-xl font-semibold text-green-600 mb-4">Your Recycling Logs</h2>
           {logs.length === 0 ? (
             <p className="text-gray-600">No logs yet. Start tracking your impact!</p>
           ) : (
