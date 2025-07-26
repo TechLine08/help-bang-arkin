@@ -1,8 +1,15 @@
 // File: /api/progress.js
 
-require('dotenv').config();
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
+
 const { Pool } = require('pg');
 const { v4: uuidv4 } = require('uuid');
+
+if (!process.env.DATABASE_URL) {
+  console.error('❌ DATABASE_URL is missing');
+}
 
 let pool;
 try {
@@ -15,11 +22,13 @@ try {
 }
 
 module.exports = async (req, res) => {
+  if (!pool) return res.status(500).json({ error: 'Database connection not initialized' });
+
   const method = req.method;
   console.log(`📡 /api/progress triggered with method: ${method}`);
-
-  // Debug: Ensure env is injected
   console.log('🔐 DATABASE_URL exists:', !!process.env.DATABASE_URL);
+
+  if (method === 'HEAD') return res.status(200).json({ ok: true });
 
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -52,6 +61,7 @@ module.exports = async (req, res) => {
         }
 
         console.log('📤 Returning logs:', result.rows.length);
+        console.log('📤 Logs payload:', JSON.stringify(result.rows, null, 2));
         return res.status(200).json(result.rows);
       }
 
