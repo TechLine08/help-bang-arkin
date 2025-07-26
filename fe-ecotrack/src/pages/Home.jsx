@@ -16,7 +16,6 @@ export default function Home() {
   const [wasteType, setWasteType] = useState('');
   const [quantity, setQuantity] = useState('');
   const [toast, setToast] = useState(null);
-  const [leaderboardType, setLeaderboardType] = useState('users');
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
 
@@ -37,11 +36,10 @@ export default function Home() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const fetchLeaderboard = useCallback(async (type) => {
+  const fetchLeaderboard = useCallback(async () => {
     setLoadingLeaderboard(true);
     try {
-      const endpoint = type === 'users' ? 'leaderboard/users' : 'leaderboard/countries';
-      const res = await fetch(getApiUrl(endpoint));
+      const res = await fetch(getApiUrl('leaderboard'));
 
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -65,19 +63,18 @@ export default function Home() {
     } catch (err) {
       console.error('❌ Failed to fetch leaderboard:', err);
       showToast(`Failed to load leaderboard: ${err.message}`, 'error');
-      setLeaderboardData([]); // fallback to avoid stuck state
+      setLeaderboardData([]);
     } finally {
       setLoadingLeaderboard(false);
     }
   }, []);
-
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
         await fetchLogs(firebaseUser.email);
-        await fetchLeaderboard('users');
+        await fetchLeaderboard();
       } else {
         setUser(null);
         setLoading(false);
@@ -111,11 +108,6 @@ export default function Home() {
       console.error('❌ Submission failed:', err);
       showToast('Submission failed. Please try again.', 'error');
     }
-  };
-
-  const handleLeaderboardToggle = (type) => {
-    setLeaderboardType(type);
-    fetchLeaderboard(type);
   };
 
   const wasteCounts = logs.reduce((acc, log) => {
@@ -205,31 +197,7 @@ export default function Home() {
 
         {/* Leaderboard */}
         <div className="bg-white shadow-md rounded-lg p-6 mb-10">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-green-600">🏆 Leaderboard</h2>
-            <div className="flex bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => handleLeaderboardToggle('users')}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition ${
-                  leaderboardType === 'users'
-                    ? 'bg-green-600 text-white'
-                    : 'text-gray-600 hover:text-gray-800'
-                }`}
-              >
-                🧑‍🤝‍🧑 Users
-              </button>
-              <button
-                onClick={() => handleLeaderboardToggle('countries')}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition ${
-                  leaderboardType === 'countries'
-                    ? 'bg-green-600 text-white'
-                    : 'text-gray-600 hover:text-gray-800'
-                }`}
-              >
-                🌍 Countries
-              </button>
-            </div>
-          </div>
+          <h2 className="text-xl font-semibold text-green-600 mb-4 text-center">🏆 Leaderboard</h2>
 
           {loadingLeaderboard ? (
             <div className="text-center py-8">
@@ -261,9 +229,9 @@ export default function Home() {
                     </div>
                     <div>
                       <p className="font-medium text-gray-800">
-                        {leaderboardType === 'users' ? item.name : item.country}
+                        {item.name || item.country}
                       </p>
-                      {leaderboardType === 'users' && item.country && (
+                      {item.country && (
                         <p className="text-sm text-gray-500">{item.country}</p>
                       )}
                     </div>
