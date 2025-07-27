@@ -1,3 +1,5 @@
+// File: /api/locations.js
+
 const { Pool } = require('pg');
 
 console.log('🟡 [locations.js] Loaded');
@@ -7,16 +9,28 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
+// ✅ Set CORS headers
+const setCors = (res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*'); // Change to your frontend domain in prod
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+};
+
 module.exports = async (req, res) => {
   const method = req.method;
+  setCors(res);
   console.log(`📥 [${method}] /api/locations hit`);
+
+  if (method === 'OPTIONS') {
+    return res.status(200).end(); // Preflight CORS response
+  }
 
   if (!pool) {
     console.error('❌ No DB connection pool');
     return res.status(500).json({ error: 'DB not initialized' });
   }
 
-  // GET — Fetch all locations
+  // === GET: Fetch all locations ===
   if (method === 'GET') {
     try {
       const result = await pool.query('SELECT * FROM locations ORDER BY created_at DESC');
@@ -28,20 +42,20 @@ module.exports = async (req, res) => {
     }
   }
 
-  // POST — Add a location
+  // === POST: Add a new location ===
   if (method === 'POST') {
     let body = req.body;
 
     try {
-      if (typeof req.body === 'string') {
-        body = JSON.parse(req.body); // In case body is stringified JSON
+      if (typeof body === 'string') {
+        body = JSON.parse(body); // Handle stringified JSON
       }
     } catch (e) {
       console.error('❌ Invalid JSON body:', e);
       return res.status(400).json({ error: 'Invalid JSON body' });
     }
 
-    const { name, address, city, region, lat, lng } = body;
+    const { name, address, city, region, lat, lng, image_url } = body;
 
     if (!name || lat == null || lng == null) {
       console.warn('⚠️ Missing required fields:', { name, lat, lng });
@@ -50,10 +64,10 @@ module.exports = async (req, res) => {
 
     try {
       const result = await pool.query(
-        `INSERT INTO locations (id, name, address, city, region, lat, lng, created_at)
-         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, NOW())
+        `INSERT INTO locations (id, name, address, city, region, lat, lng, image_url, created_at)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, NOW())
          RETURNING *`,
-        [name, address || '', city || '', region || '', lat, lng]
+        [name, address || '', city || '', region || '', lat, lng, image_url || null]
       );
       console.log('✅ Inserted:', result.rows[0]);
       return res.status(201).json(result.rows[0]);
@@ -63,7 +77,7 @@ module.exports = async (req, res) => {
     }
   }
 
-  // Method not allowed
+  // === Fallback ===
   console.warn('🚫 Method not allowed:', method);
   return res.status(405).json({ error: 'Method not allowed' });
 };
