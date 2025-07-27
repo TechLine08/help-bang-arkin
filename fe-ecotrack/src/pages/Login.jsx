@@ -25,35 +25,32 @@ export default function Login() {
     }
 
     try {
+      console.log('📤 Sending login request...');
       const res = await fetch(getApiUrl('api/auth'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'login',
-          email,
-          password,
-        }),
+        body: JSON.stringify({ action: 'login', email, password }),
       });
 
       const data = await res.json();
+      console.log('📥 Login response:', data);
 
       if (!res.ok) {
-        showToast(data.error || 'Login failed.', 'error');
+        showToast(data?.error || 'Login failed. Please try again.', 'error');
         return;
       }
 
-      showToast('Login successful!', 'success');
-
-      // Save to localStorage/session if needed
+      // Save user to localStorage or context
       localStorage.setItem('loggedInUser', JSON.stringify(data));
+      if (data.role === 'admin') {
+        localStorage.setItem('navbarSource', 'admin');
+        navigate('/admin');
+      } else {
+        localStorage.setItem('navbarSource', 'dashboard');
+        navigate('/home');
+      }
 
-      setTimeout(() => {
-        if (data.role === 'admin') {
-          navigate('/admin');
-        } else {
-          navigate('/home');
-        }
-      }, 500);
+      showToast('Login successful!', 'success');
     } catch (error) {
       console.error('❌ Login error:', error);
       showToast('Login failed. Please try again.', 'error');
