@@ -3,16 +3,26 @@
 require('dotenv').config();
 const { Pool } = require('pg');
 
+// 🛡️ Initialize DB pool
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
 
+// 🧠 Main handler
 module.exports = async (req, res) => {
   const { method } = req;
   const { scope = 'individual' } = req.query;
 
-  console.log(`📊 /api/leaderboard requested with method: ${method}, scope: ${scope}`);
+  // 🌍 Set CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // 🛑 Handle preflight
+  if (method === 'OPTIONS') {
+    return res.status(200).end();
+  }
 
   if (method !== 'GET') {
     console.warn(`🚫 Method ${method} not allowed`);
@@ -21,7 +31,7 @@ module.exports = async (req, res) => {
 
   try {
     if (scope === 'country') {
-      const query = `
+      const countryQuery = `
         SELECT u.country,
                COALESCE(SUM(p.bottle_count), 0) AS total_bottles,
                COALESCE(SUM(p.weight_kg), 0) AS total_weight
@@ -32,13 +42,13 @@ module.exports = async (req, res) => {
         LIMIT 10;
       `;
 
-      const result = await pool.query(query);
+      const result = await pool.query(countryQuery);
       console.log(`✅ Returned ${result.rows.length} country leaderboard rows`);
       return res.status(200).json(result.rows);
     }
 
-    // Default to individual leaderboard
-    const query = `
+    // Default: individual leaderboard
+    const individualQuery = `
       SELECT u.id, u.name, u.avatar_url, u.country,
              COALESCE(SUM(p.bottle_count), 0) AS total_bottles,
              COALESCE(SUM(p.weight_kg), 0) AS total_weight
@@ -49,7 +59,7 @@ module.exports = async (req, res) => {
       LIMIT 10;
     `;
 
-    const result = await pool.query(query);
+    const result = await pool.query(individualQuery);
     console.log(`✅ Returned ${result.rows.length} individual leaderboard rows`);
     return res.status(200).json(result.rows);
   } catch (err) {
