@@ -7,6 +7,7 @@ if (process.env.NODE_ENV !== 'production') {
 const { Pool } = require('pg');
 const { v4: uuidv4 } = require('uuid');
 
+// Check for .env
 if (!process.env.DATABASE_URL) {
   console.error('❌ DATABASE_URL is missing');
 }
@@ -22,25 +23,28 @@ try {
 }
 
 module.exports = async (req, res) => {
-  if (!pool) return res.status(500).json({ error: 'Database connection not initialized' });
-
   const method = req.method;
   console.log(`📡 /api/progress triggered with method: ${method}`);
-  console.log('🔐 DATABASE_URL exists:', !!process.env.DATABASE_URL);
 
-  if (method === 'HEAD') return res.status(200).json({ ok: true });
+  // Check DB connection
+  if (!pool) {
+    console.error('❌ No DB pool initialized');
+    return res.status(500).json({ error: 'Database connection not initialized' });
+  }
 
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (method === 'OPTIONS') return res.status(200).end();
+  if (method === 'HEAD') return res.status(200).json({ ok: true });
 
   try {
     switch (method) {
+      // GET — Fetch user progress logs
       case 'GET': {
         const { user_id } = req.query;
-        console.log('🔍 GET progress', user_id ? `for user_id: ${user_id}` : 'for all users');
+        console.log('🔍 GET progress logs', user_id ? `for user_id: ${user_id}` : 'for all users');
 
         let result;
         if (user_id) {
@@ -50,6 +54,8 @@ module.exports = async (req, res) => {
             WHERE user_id = $1
             ORDER BY recycled_at DESC
           `;
+          console.log('🧪 Executing query:', query);
+          console.log('🧪 With user_id:', user_id);
           result = await pool.query(query, [user_id]);
         } else {
           const query = `
@@ -57,14 +63,16 @@ module.exports = async (req, res) => {
             FROM recycling_logs
             ORDER BY recycled_at DESC
           `;
+          console.log('🧪 Executing general query (no user_id)');
           result = await pool.query(query);
         }
 
-        console.log('📤 Returning logs:', result.rows.length);
+        console.log('✅ Query successful, returned rows:', result.rowCount);
         console.log('📤 Logs payload:', JSON.stringify(result.rows, null, 2));
         return res.status(200).json(result.rows);
       }
 
+      // POST — Add new progress log
       case 'POST': {
         const {
           user_id,
@@ -76,7 +84,7 @@ module.exports = async (req, res) => {
           photo_url = null,
         } = req.body;
 
-        console.log('➕ POST new recycling entry:', {
+        console.log('➕ POST new recycling entry with data:', {
           user_id,
           location_id,
           material_type,
@@ -115,6 +123,7 @@ module.exports = async (req, res) => {
         return res.status(201).json(result.rows[0]);
       }
 
+      // DELETE — Remove a recycling log
       case 'DELETE': {
         const { id } = req.query;
         if (!id) return res.status(400).json({ error: 'Missing recycling log ID' });
@@ -125,11 +134,14 @@ module.exports = async (req, res) => {
       }
 
       default:
-        console.warn('❌ Unsupported method');
+        console.warn('❌ Unsupported HTTP method:', method);
         return res.status(405).json({ error: 'Method not allowed' });
     }
   } catch (err) {
     console.error('❌ Error in /api/progress:', err.stack || err.message || err);
-    return res.status(500).json({ error: 'Internal server error', details: err.message });
+    return res.status(500).json({
+      error: 'Internal server error',
+      details: err.message,
+    });
   }
 };
