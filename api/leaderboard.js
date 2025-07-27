@@ -12,7 +12,6 @@ module.exports = async (req, res) => {
   const { method } = req;
   const { scope = 'individual' } = req.query;
 
-  // 🌐 CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -21,58 +20,64 @@ module.exports = async (req, res) => {
   if (method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    // 🗓 Get latest year and week_or_month from leaderboard table
-    const meta = await pool.query(`
-      SELECT year, week_or_month
-      FROM leaderboard
-      WHERE period = 'week'
-      ORDER BY year DESC, week_or_month DESC
-      LIMIT 1;
-    `);
-
-    if (meta.rowCount === 0) {
-      return res.status(200).json([]); // no data available
-    }
-
-    const { year, week_or_month } = meta.rows[0];
-
-    // ==============================
-    // 🌍 Country leaderboard
-    // ==============================
+    // 🌍 COUNTRY LEADERBOARD
     if (scope === 'country') {
       const result = await pool.query(`
-        SELECT country, total_points, total_bottles, total_weight
-        FROM national_leaderboard
-        WHERE period = 'week'
-          AND year = $1
-          AND week_or_month = $2
+        SELECT
+          u.country,
+          SUM(p.bottle_count) AS total_bottles,
+          SUM(p.weight_kg) AS total_weight,
+          json_object_agg(
+            p.material_type,
+            json_build_object(
+              'count', p.total_count,
+              'weight', p.total_weight
+            )
+          ) AS materials
+        FROM users u
+        LEFT JOIN (
+          SELECT user_id, material_type,
+                 SUM(bottle_count) AS total_count,
+                 SUM(weight_kg) AS total_weight
+          FROM progress
+          GROUP BY user_id, material_type
+        ) p ON u.id = p.user_id
+        GROUP BY u.country
         ORDER BY total_weight DESC
         LIMIT 10;
-      `, [year, week_or_month]);
+      `);
 
       return res.status(200).json(result.rows);
     }
 
-    // ==============================
-    // 👤 Individual leaderboard
-    // ==============================
+    // 👤 INDIVIDUAL LEADERBOARD
     const result = await pool.query(`
       SELECT
         u.id,
         u.name,
-        u.country,
         u.avatar_url,
-        l.total_points,
-        l.total_bottles,
-        l.total_weight
-      FROM leaderboard l
-      JOIN users u ON l.user_id = u.id
-      WHERE l.period = 'week'
-        AND l.year = $1
-        AND l.week_or_month = $2
-      ORDER BY l.total_weight DESC
+        u.country,
+        SUM(p.total_count) AS total_bottles,
+        SUM(p.total_weight) AS total_weight,
+        json_object_agg(
+          p.material_type,
+          json_build_object(
+            'count', p.total_count,
+            'weight', p.total_weight
+          )
+        ) AS materials
+      FROM users u
+      LEFT JOIN (
+        SELECT user_id, material_type,
+               SUM(bottle_count) AS total_count,
+               SUM(weight_kg) AS total_weight
+        FROM progress
+        GROUP BY user_id, material_type
+      ) p ON u.id = p.user_id
+      GROUP BY u.id, u.name, u.avatar_url, u.country
+      ORDER BY total_weight DESC
       LIMIT 10;
-    `, [year, week_or_month]);
+    `);
 
     return res.status(200).json(result.rows);
   } catch (err) {
