@@ -5,6 +5,7 @@ import { Pool } from 'pg';
 import formidable from 'formidable';
 import fs from 'fs';
 
+// Disable default body parsing so we can handle file uploads
 export const config = {
   api: {
     bodyParser: false,
@@ -26,6 +27,17 @@ const pool = new Pool({
 export default async function handler(req, res) {
   console.log('📥 Incoming request to /api/edit-profile');
 
+  // === ✅ CORS headers ===
+  res.setHeader('Access-Control-Allow-Origin', '*'); // Set specific domain in prod
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // === ✅ Preflight handler ===
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  // === GET: Fetch user profile ===
   if (req.method === 'GET') {
     const { user_id } = req.query;
 
@@ -44,7 +56,8 @@ export default async function handler(req, res) {
       }
 
       const user = result.rows[0];
-      const defaultAvatar = 'https://kqolfqxyiywlkintnoky.supabase.co/storage/v1/object/public/avatars/default.jpg';
+      const defaultAvatar =
+        'https://kqolfqxyiywlkintnoky.supabase.co/storage/v1/object/public/avatars/default.jpg';
 
       return res.status(200).json({
         ...user,
@@ -56,6 +69,7 @@ export default async function handler(req, res) {
     }
   }
 
+  // === POST: Update profile with optional avatar upload ===
   if (req.method === 'POST') {
     const form = new formidable.IncomingForm({ keepExtensions: true });
 
@@ -78,7 +92,7 @@ export default async function handler(req, res) {
       let avatar_url = null;
 
       try {
-        // Upload avatar to Supabase Storage
+        // === Upload avatar to Supabase Storage ===
         if (file && file[0] && file[0].filepath) {
           const fileData = file[0];
           const fileBuffer = fs.readFileSync(fileData.filepath);
@@ -105,11 +119,12 @@ export default async function handler(req, res) {
         }
 
         // Normalize marketing_opt_in
-        const marketingOpt = typeof marketing_opt_in === 'string'
-          ? marketing_opt_in.toLowerCase() === 'true'
-          : null;
+        const marketingOpt =
+          typeof marketing_opt_in === 'string'
+            ? marketing_opt_in.toLowerCase() === 'true'
+            : null;
 
-        // Update user info
+        // === Update user info in DB ===
         const result = await pool.query(
           `
           UPDATE users
@@ -129,7 +144,8 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'Internal server error' });
       }
     });
-  } else {
-    return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  // === Method not allowed ===
+  return res.status(405).json({ error: 'Method not allowed' });
 }
