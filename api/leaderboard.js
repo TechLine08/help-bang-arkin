@@ -12,6 +12,7 @@ module.exports = async (req, res) => {
   const { method } = req;
   const { scope = 'individual' } = req.query;
 
+  // 🌐 CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -24,25 +25,11 @@ module.exports = async (req, res) => {
     if (scope === 'country') {
       const result = await pool.query(`
         SELECT
-          u.country,
-          SUM(p.bottle_count) AS total_bottles,
-          SUM(p.weight_kg) AS total_weight,
-          json_object_agg(
-            p.material_type,
-            json_build_object(
-              'count', p.total_count,
-              'weight', p.total_weight
-            )
-          ) AS materials
-        FROM users u
-        LEFT JOIN (
-          SELECT user_id, material_type,
-                 SUM(bottle_count) AS total_count,
-                 SUM(weight_kg) AS total_weight
-          FROM progress
-          GROUP BY user_id, material_type
-        ) p ON u.id = p.user_id
-        GROUP BY u.country
+          country,
+          total_weight,
+          materials,
+          updated_at
+        FROM national_leaderboard
         ORDER BY total_weight DESC
         LIMIT 10;
       `);
@@ -57,25 +44,12 @@ module.exports = async (req, res) => {
         u.name,
         u.avatar_url,
         u.country,
-        SUM(p.total_count) AS total_bottles,
-        SUM(p.total_weight) AS total_weight,
-        json_object_agg(
-          p.material_type,
-          json_build_object(
-            'count', p.total_count,
-            'weight', p.total_weight
-          )
-        ) AS materials
-      FROM users u
-      LEFT JOIN (
-        SELECT user_id, material_type,
-               SUM(bottle_count) AS total_count,
-               SUM(weight_kg) AS total_weight
-        FROM progress
-        GROUP BY user_id, material_type
-      ) p ON u.id = p.user_id
-      GROUP BY u.id, u.name, u.avatar_url, u.country
-      ORDER BY total_weight DESC
+        l.total_weight,
+        l.materials,
+        l.updated_at
+      FROM leaderboard l
+      JOIN users u ON l.user_id = u.id
+      ORDER BY l.total_weight DESC
       LIMIT 10;
     `);
 
