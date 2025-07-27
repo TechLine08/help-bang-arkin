@@ -17,15 +17,14 @@ export default function Home() {
   const [quantity, setQuantity] = useState('');
   const [toast, setToast] = useState(null);
   const [leaderboardData, setLeaderboardData] = useState([]);
+  const [userRank, setUserRank] = useState(null);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
   const [leaderboardScope, setLeaderboardScope] = useState('individual');
 
   const fetchLogs = async (uid) => {
     try {
-      console.log('📦 Fetching logs for:', uid);
       const res = await fetch(getApiUrl(`api/progress?user_id=${uid}`));
       const data = await res.json();
-      console.log('📬 Logs response:', data);
       setLogs(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('❌ Failed to fetch logs:', err);
@@ -45,28 +44,38 @@ export default function Home() {
       const res = await fetch(getApiUrl(`/api/leaderboard?scope=${leaderboardScope}`));
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
       const data = await res.json();
-      console.log('📊 Leaderboard API response:', data);
 
-      const leaderboard = Array.isArray(data)
+      const allData = Array.isArray(data)
         ? data
         : data?.success && Array.isArray(data.data)
         ? data.data
         : [];
 
-      if (leaderboard.length === 0) {
-        console.warn('⚠️ Leaderboard empty or invalid structure');
+      if (allData.length === 0) {
         showToast('No leaderboard data found.', 'info');
       }
 
-      setLeaderboardData(leaderboard);
+      if (leaderboardScope === 'individual' && user) {
+        const index = allData.findIndex((entry) => entry.user_id === user.uid);
+        if (index !== -1) {
+          setUserRank({ ...allData[index], rank: index + 1 });
+        } else {
+          setUserRank(null);
+        }
+      } else {
+        setUserRank(null);
+      }
+
+      setLeaderboardData(allData.slice(0, 3));
     } catch (err) {
       console.error('❌ Failed to fetch leaderboard:', err);
       showToast(`Failed to load leaderboard: ${err.message}`, 'error');
       setLeaderboardData([]);
+      setUserRank(null);
     } finally {
       setLoadingLeaderboard(false);
     }
-  }, [leaderboardScope]);
+  }, [leaderboardScope, user]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -158,7 +167,7 @@ export default function Home() {
                 value={wasteType}
                 onChange={(e) => setWasteType(e.target.value)}
                 placeholder="e.g. Plastic, Paper, Glass"
-                className="w-full px-4 py-2 border rounded-md focus:ring-green-500 focus:outline-none"
+                className="w-full px-4 py-2 border rounded-md"
               />
             </div>
             <div>
@@ -172,7 +181,7 @@ export default function Home() {
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
                 placeholder="e.g. 3"
-                className="w-full px-4 py-2 border rounded-md focus:ring-green-500 focus:outline-none"
+                className="w-full px-4 py-2 border rounded-md"
               />
             </div>
             <button
@@ -256,7 +265,7 @@ export default function Home() {
                       <p className="font-medium text-gray-800">
                         {leaderboardScope === 'country'
                           ? item.country
-                          : item.users?.displayName || item.user_id}
+                          : item.users?.display_name || item.user_id}
                       </p>
                     </div>
                   </div>
@@ -270,6 +279,31 @@ export default function Home() {
                   </div>
                 </div>
               ))}
+
+              {/* Show user's rank if not in top 3 */}
+              {userRank && userRank.rank > 3 && (
+                <div className="border-t pt-4 mt-4">
+                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-green-600 text-white flex items-center justify-center font-bold text-sm">
+                        {userRank.rank}
+                      </div>
+                      <div>
+                        <p className="font-medium text-green-800">
+                          {userRank.users?.display_name || userRank.user_id}
+                        </p>
+                        <p className="text-xs text-gray-500">You</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-green-600">
+                        {(userRank.total_points || 0).toLocaleString()}
+                      </p>
+                      <p className="text-xs text-gray-500">points</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
