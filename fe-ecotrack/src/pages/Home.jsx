@@ -39,7 +39,7 @@ export default function Home() {
   const fetchLeaderboard = useCallback(async () => {
     setLoadingLeaderboard(true);
     try {
-      const res = await fetch(getApiUrl('leaderboard'));
+      const res = await fetch(getApiUrl('/api/leaderboard'));
 
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}: ${res.statusText}`);
