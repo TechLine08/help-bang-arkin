@@ -18,12 +18,14 @@ export default function Home() {
   const [toast, setToast] = useState(null);
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
-  const [leaderboardScope, setLeaderboardScope] = useState('individual'); // new
+  const [leaderboardScope, setLeaderboardScope] = useState('individual');
 
   const fetchLogs = async (uid) => {
     try {
+      console.log('📦 Fetching logs for:', uid);
       const res = await fetch(getApiUrl(`api/progress?user_id=${uid}`));
       const data = await res.json();
+      console.log('📬 Logs response:', data);
       setLogs(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('❌ Failed to fetch logs:', err);
@@ -252,7 +254,9 @@ export default function Home() {
                     </div>
                     <div>
                       <p className="font-medium text-gray-800">
-                        {leaderboardScope === 'country' ? item.country : item.users?.name || item.user_id}
+                        {leaderboardScope === 'country'
+                          ? item.country
+                          : item.users?.displayName || item.user_id}
                       </p>
                     </div>
                   </div>
