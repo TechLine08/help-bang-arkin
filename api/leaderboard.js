@@ -1,5 +1,3 @@
-// File: /api/leaderboard.js
-
 require('dotenv').config();
 const { Pool } = require('pg');
 
@@ -19,6 +17,8 @@ module.exports = async (req, res) => {
   if (method === 'OPTIONS') return res.status(200).end();
   if (method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
+  console.log(`📥 Request to /api/leaderboard with scope=${scope}`);
+
   try {
     if (scope === 'country') {
       // 🌍 NATIONAL LEADERBOARD
@@ -33,7 +33,11 @@ module.exports = async (req, res) => {
         LIMIT 10;
       `);
 
-      console.log(`✅ Returned ${result.rows.length} national leaderboard rows`);
+      console.log(`🌍 Returned ${result.rows.length} national leaderboard rows`);
+      if (result.rows.length === 0) {
+        console.warn('⚠️ No rows found in national_leaderboard table');
+      }
+
       return res.status(200).json(result.rows);
     }
 
@@ -53,7 +57,11 @@ module.exports = async (req, res) => {
       LIMIT 10;
     `);
 
-    console.log(`✅ Returned ${result.rows.length} individual leaderboard rows`);
+    console.log(`👤 Returned ${result.rows.length} individual leaderboard rows`);
+    if (result.rows.length === 0) {
+      console.warn('⚠️ No rows found in leaderboard table or join failed with users');
+    }
+
     return res.status(200).json(result.rows);
 
   } catch (err) {
