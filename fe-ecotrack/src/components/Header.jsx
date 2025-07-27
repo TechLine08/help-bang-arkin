@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '../firebase';
-import { FaRecycle } from 'react-icons/fa';
+import { FaRecycle, FaTimes } from 'react-icons/fa';
 
 const Header = () => {
   const [user, setUser] = useState(null);
@@ -19,7 +19,6 @@ const Header = () => {
       setUser(firebaseUser);
     });
 
-    // Close drawer on outside click
     const handleClickOutside = (e) => {
       if (drawerRef.current && !drawerRef.current.contains(e.target)) {
         setAvatarOpen(false);
@@ -60,7 +59,7 @@ const Header = () => {
           EcoTrack
         </Link>
 
-        {/* Nav Links */}
+        {/* Nav */}
         <div className="hidden md:flex gap-8 items-center text-base font-medium">
           {!user ? (
             <>
@@ -84,61 +83,75 @@ const Header = () => {
             </>
           ) : (
             <>
-              {/* Avatar Icon */}
               <img
                 src={user.photoURL || defaultAvatar}
                 alt="avatar"
-                onClick={() => setAvatarOpen(!avatarOpen)}
-                className="w-10 h-10 rounded-full cursor-pointer object-cover border border-gray-300"
+                onClick={() => setAvatarOpen(true)}
+                className="w-12 h-12 rounded-full cursor-pointer object-cover border-2 border-gray-300"
               />
             </>
           )}
         </div>
       </div>
 
-      {/* Avatar Drawer */}
+      {/* Drawer */}
       {avatarOpen && user && (
-        <div
-          ref={drawerRef}
-          className="absolute top-20 right-6 bg-white shadow-xl rounded-md border w-48 z-50 animate-slide-in"
-        >
-          <ul className="flex flex-col divide-y">
-            <li>
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="fixed inset-0 bg-black opacity-40" onClick={() => setAvatarOpen(false)} />
+          <div
+            ref={drawerRef}
+            className="relative bg-white w-72 h-full shadow-lg p-6 animate-slide-in flex flex-col"
+          >
+            <button
+              className="absolute top-4 right-4 text-xl text-gray-500 hover:text-red-600"
+              onClick={() => setAvatarOpen(false)}
+            >
+              <FaTimes />
+            </button>
+
+            <div className="mt-10 flex flex-col items-center">
+              <img
+                src={user.photoURL || defaultAvatar}
+                alt="avatar"
+                className="w-24 h-24 rounded-full object-cover border-4 border-green-500"
+              />
+              <h2 className="mt-4 text-lg font-semibold text-gray-800">
+                {user.displayName || 'Anonymous'}
+              </h2>
+            </div>
+
+            <hr className="my-6" />
+
+            <nav className="flex flex-col gap-4 text-base">
               <Link
                 to="/home"
                 onClick={() => setAvatarOpen(false)}
-                className="block px-4 py-3 hover:bg-gray-100"
+                className="hover:text-green-600"
               >
                 Dashboard
               </Link>
-            </li>
-            <li>
               <Link
                 to="/marketplace"
                 onClick={() => setAvatarOpen(false)}
-                className="block px-4 py-3 hover:bg-gray-100"
+                className="hover:text-green-600"
               >
                 Marketplace
               </Link>
-            </li>
-            <li>
               <Link
                 to="/edit-profile"
                 onClick={() => setAvatarOpen(false)}
-                className="block px-4 py-3 hover:bg-gray-100"
+                className="hover:text-green-600"
               >
                 Edit Profile
               </Link>
-            </li>
-            <li>
               <button
                 onClick={handleLogout}
-                className="w-full text-left px-4 py-3 text-red-600 hover:bg-gray-100"
+                className="text-left text-red-600 hover:text-red-800"
               >
                 Logout
               </button>
-            </li>
-          </ul>
+            </nav>
+          </div>
         </div>
       )}
     </header>
