@@ -2,15 +2,13 @@ require('dotenv').config();
 const { Pool } = require('pg');
 const nodemailer = require('nodemailer');
 
-// DB Pool
+// PostgreSQL Pool
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-  },
+  ssl: { rejectUnauthorized: false },
 });
 
-// Daily Tips — Now with title and content
+// ✅ Daily Tips — now with title and content
 const tips = [
   {
     title: "♻️ Rinse Before You Recycle",
@@ -46,7 +44,7 @@ const tips = [
   },
 ];
 
-// Nodemailer transporter
+// ✅ Nodemailer setup
 const transporter = nodemailer.createTransport({
   host: process.env.MAIL_HOST,
   port: process.env.MAIL_PORT,
@@ -56,7 +54,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Send individual email
+// ✅ Send individual email
 const sendEmail = async ({ to, subject, html }) => {
   try {
     await transporter.sendMail({
@@ -65,14 +63,16 @@ const sendEmail = async ({ to, subject, html }) => {
       subject,
       html,
     });
+    console.log(`📤 Email sent to ${to}`);
   } catch (err) {
     console.error(`❌ Failed to send email to ${to}:`, err.message);
   }
 };
 
-// Main logic
+// ✅ Main tip distribution logic
 const sendTips = async () => {
   const client = await pool.connect();
+
   try {
     const { rows: users } = await client.query(`
       SELECT id, name, email, last_tip_index
@@ -87,14 +87,16 @@ const sendTips = async () => {
 
     for (const user of users) {
       const index = user.last_tip_index ?? 0;
-      const { title, content } = tips[index];
+      const tip = tips[index];
+
+      if (!tip) continue; // just in case array gets out of sync
 
       const html = `
         <div style="font-family: sans-serif; padding: 1rem;">
           <h2>Hi ${user.name},</h2>
           <p>Here's your eco tip for today:</p>
-          <h3 style="color:#2e7d32;">${title}</h3>
-          <p>${content}</p>
+          <h3 style="color:#2e7d32;">${tip.title}</h3>
+          <p>${tip.content}</p>
           <p>Let’s take action today 🌍</p>
           <a href="${process.env.FRONTEND_URL}" style="display:inline-block;padding:10px 20px;background:#388e3c;color:#fff;text-decoration:none;border-radius:5px;">Open EcoTrack</a>
         </div>
@@ -102,7 +104,7 @@ const sendTips = async () => {
 
       await sendEmail({
         to: user.email,
-        subject: `🌱 ${title}`,
+        subject: `🌱 ${tip.title}`,
         html,
       });
 
@@ -110,7 +112,7 @@ const sendTips = async () => {
       await client.query(`UPDATE users SET last_tip_index = $1 WHERE id = $2`, [nextIndex, user.id]);
     }
 
-    console.log(`✅ Sent eco tips to ${users.length} users.`);
+    console.log(`✅ Sent eco tips to ${users.length} user(s).`);
   } catch (err) {
     console.error('❌ Error during sendTips():', err);
     throw err;
@@ -119,10 +121,10 @@ const sendTips = async () => {
   }
 };
 
-// CLI support
+// ✅ CLI support
 if (require.main === module) {
   sendTips();
 }
 
-// Export for API usage
+// ✅ Export for API route
 module.exports = { sendTips };
