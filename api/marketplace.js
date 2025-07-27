@@ -1,3 +1,5 @@
+// File: /api/marketplace.js
+
 require('dotenv').config();
 const { Pool } = require('pg');
 
@@ -12,18 +14,18 @@ const pool = new Pool({
 
 // CORS headers
 const setCors = (res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*'); // Update to specific domain in prod if needed
+  res.setHeader('Access-Control-Allow-Origin', '*'); // Change to your frontend domain in prod
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 };
 
 module.exports = async (req, res) => {
   const method = req.method;
-  console.log(`🛍️ /api/marketplace invoked with method: ${method}`);
   setCors(res);
+  console.log(`🛍️ /api/marketplace invoked with method: ${method}`);
 
   if (method === 'OPTIONS') {
-    // Preflight response
+    // Handle CORS preflight
     return res.status(200).end();
   }
 
@@ -33,7 +35,7 @@ module.exports = async (req, res) => {
   }
 
   try {
-    // === GET: List vouchers ===
+    // === GET: List all vouchers ===
     if (method === 'GET') {
       console.log('📥 Fetching vouchers...');
       const result = await pool.query('SELECT * FROM vouchers ORDER BY created_at DESC');
@@ -47,33 +49,35 @@ module.exports = async (req, res) => {
 
       try {
         if (typeof body === 'string') {
-          body = JSON.parse(body); // Fallback for raw JSON
+          body = JSON.parse(body); // For raw JSON POSTs
         }
       } catch (err) {
         console.error('❌ Failed to parse request body:', err);
         return res.status(400).json({ error: 'Invalid JSON body' });
       }
 
-      const { name, description, image_url, points_required } = body;
-      console.log('📦 Creating voucher with:', { name, points_required });
+      const { name, description, image_url, points_required, stock } = body;
+      console.log('📦 Creating voucher with:', { name, points_required, stock });
 
-      if (!name || !description || !image_url || points_required == null) {
-        console.warn('⚠️ Missing required fields:', { name, description, image_url, points_required });
+      if (!name || !description || !image_url || points_required == null || stock == null) {
+        console.warn('⚠️ Missing required fields:', { name, description, image_url, points_required, stock });
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
       const result = await pool.query(
-        `INSERT INTO vouchers (name, description, image_url, points_required)
-         VALUES ($1, $2, $3, $4) RETURNING *`,
-        [name, description, image_url, points_required]
+        `INSERT INTO vouchers (name, description, image_url, points_required, stock)
+         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        [name, description, image_url, points_required, stock]
       );
 
       console.log('✅ Voucher created:', result.rows[0]);
       return res.status(201).json(result.rows[0]);
     }
 
+    // === Unsupported method ===
     console.warn('🚫 Method not allowed:', method);
     return res.status(405).json({ error: 'Method not allowed' });
+
   } catch (err) {
     console.error('❌ Error in /api/marketplace:', err);
     return res.status(500).json({ error: 'Internal server error' });
