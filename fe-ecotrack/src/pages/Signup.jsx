@@ -115,7 +115,7 @@ export default function Signup() {
         <Header />
       </div>
 
-      <div className="relative z-10 flex items-center justify-center min-h-screen px-4 pt-24 md:pt-36">
+      <div className="relative z-10 flex items-center justify-center min-h-screen px-4 pt-24 pb-16 md:pt-36 md:pb-24">
         <div className="bg-white bg-opacity-90 backdrop-blur-md p-8 rounded-lg shadow-lg max-w-md w-full">
           <h2 className="text-3xl font-bold text-center text-green-700 mb-6">Sign Up</h2>
 
