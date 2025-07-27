@@ -11,8 +11,16 @@ import ForgotPassword from './pages/ForgotPassword';
 import Contact from './pages/Contact';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 
-// 🔒 Authenticated Pages
-import Home from './pages/Home'; // Dashboard after login/signup
+// 🔒 Authenticated User Dashboard
+import Home from './pages/Home';
+
+// 🛠 Admin Pages
+import AdminHome from './pages/Admin/AdminHome';
+import ManageVouchers from './pages/Admin/ManageVouchers';
+// Optional future admin pages:
+// import ViewFeedback from './pages/Admin/ViewFeedback';
+// import SendTips from './pages/Admin/SendTips';
+// import RedeemHistory from './pages/Admin/RedeemHistory';
 
 function App() {
   return (
@@ -26,11 +34,18 @@ function App() {
         <Route path="/contact" element={<Contact />} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
-        {/* 🔐 Authenticated Route */}
+        {/* 🔐 User Dashboard */}
         <Route path="/home" element={<Home />} />
+
+        {/* 🛡️ Admin Routes */}
+        <Route path="/admin" element={<AdminHome />} />
+        <Route path="/admin/manage-vouchers" element={<ManageVouchers />} />
+        {/* <Route path="/admin/view-feedback" element={<ViewFeedback />} /> */}
+        {/* <Route path="/admin/send-tips" element={<SendTips />} /> */}
+        {/* <Route path="/admin/redeem-history" element={<RedeemHistory />} /> */}
       </Routes>
 
-      {/* 🔔 Toast notifications */}
+      {/* 🔔 Global Toast Notifications */}
       <ToastContainer position="top-right" autoClose={3000} hideProgressBar />
     </>
   );

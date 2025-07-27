@@ -12,9 +12,22 @@ const pool = new Pool({
   },
 });
 
+// CORS headers
+const setCors = (res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*'); // Update to specific domain in prod if needed
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+};
+
 module.exports = async (req, res) => {
   const method = req.method;
   console.log(`🛍️ /api/marketplace invoked with method: ${method}`);
+  setCors(res);
+
+  if (method === 'OPTIONS') {
+    // Preflight response
+    return res.status(200).end();
+  }
 
   if (!pool) {
     console.error('🔴 Pool is not initialized');
