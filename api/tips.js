@@ -1,20 +1,25 @@
-const { Pool } = require('pg');
-const cors = require('cors');
+// File: /api/tips.js
 
+const { Pool } = require('pg');
+
+// PostgreSQL pool setup
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
 
-// Simple CORS headers
+// === ✅ CORS Wrapper ===
 const allowCors = (handler) => async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', '*'); // In production, use your domain
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
   return handler(req, res);
 };
 
+// === ✅ Main Handler ===
 const handler = async (req, res) => {
   const { method } = req;
 
@@ -37,7 +42,7 @@ const handler = async (req, res) => {
 
     try {
       const result = await pool.query(
-        `INSERT INTO tips (title, content) VALUES ($1, $2) RETURNING *`,
+        'INSERT INTO tips (title, content) VALUES ($1, $2) RETURNING *',
         [title, content]
       );
       return res.status(201).json(result.rows[0]);
