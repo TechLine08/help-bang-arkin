@@ -7,9 +7,23 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
+// CORS helper
+function setCorsHeaders(res) {
+  res.setHeader('Access-Control-Allow-Origin', '*'); // or restrict to a domain in prod
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+}
+
 module.exports = async (req, res) => {
+  setCorsHeaders(res); // ✅ Always set CORS headers
+
   const method = req.method;
   console.log(`📥 [${method}] /api/locations hit`);
+
+  if (method === 'OPTIONS') {
+    // ✅ Preflight request
+    return res.status(200).end();
+  }
 
   if (!pool) {
     console.error('❌ No DB connection pool');
@@ -34,7 +48,7 @@ module.exports = async (req, res) => {
 
     try {
       if (typeof req.body === 'string') {
-        body = JSON.parse(req.body); // In case body is stringified JSON
+        body = JSON.parse(req.body); // Handle raw JSON
       }
     } catch (e) {
       console.error('❌ Invalid JSON body:', e);
