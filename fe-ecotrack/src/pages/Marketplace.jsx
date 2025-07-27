@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase';
 import Header from '../components/Header';
@@ -7,7 +7,6 @@ import { getApiUrl } from '../config/api';
 
 export default function Marketplace() {
   console.log('🏪 Marketplace component rendered');
-  const [user, setUser] = useState(null);
   const [vouchers, setVouchers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
@@ -22,7 +21,7 @@ export default function Marketplace() {
     console.log('🏪 Marketplace component mounted');
   }, []);
 
-  const fetchVouchers = async () => {
+  const fetchVouchers = useCallback(async () => {
     try {
       console.log('🔍 Fetching vouchers from:', getApiUrl('api/marketplace'));
       const res = await fetch(getApiUrl('api/marketplace'), {
@@ -46,22 +45,20 @@ export default function Marketplace() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     // Fetch vouchers immediately if user is already authenticated
     if (auth.currentUser) {
-      setUser(auth.currentUser);
       fetchVouchers();
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
       // Fetch vouchers regardless of authentication status
       await fetchVouchers();
     });
     return () => unsubscribe();
-  }, []);
+  }, [fetchVouchers]);
 
   const handleRedeem = (voucher) => {
     // TODO: Implement redemption logic
