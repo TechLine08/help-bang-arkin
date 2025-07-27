@@ -1,6 +1,5 @@
-// File: /api/auth.js
-
 const { Pool } = require('pg');
+const bcrypt = require('bcrypt');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -11,26 +10,25 @@ module.exports = async (req, res) => {
   const { method, query, body } = req;
 
   // === ✅ CORS headers ===
-  res.setHeader('Access-Control-Allow-Origin', '*'); // Change to frontend domain in prod
+  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // === ✅ Preflight request ===
-  if (method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (method === 'OPTIONS') return res.status(200).end();
 
   console.log(`📥 [${method}] /api/auth`);
 
-  // === GET: Fetch user by ID or ping ===
+  // === ✅ GET: Fetch user by ID ===
   if (method === 'GET') {
     const { id } = query;
-
     if (id) {
       try {
         const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
-        return res.status(200).json(result.rows[0]);
+
+        const user = result.rows[0];
+        delete user.password;
+        return res.status(200).json(user);
       } catch (err) {
         console.error('❌ Error fetching user:', err);
         return res.status(500).json({ error: 'Internal server error' });
@@ -40,44 +38,82 @@ module.exports = async (req, res) => {
     return res.status(200).json({ message: '✅ Auth API is live!' });
   }
 
-  // === POST: Register user ===
+  // === ✅ POST: Register user ===
   if (method === 'POST') {
     const {
       name,
       email,
-      country,
-      avatar_url = null,
+      country = null,
+      password,
+      avatar_url,
       marketing_opt_in = false,
     } = body;
 
-    if (!name || !email || !country) {
-      return res.status(400).json({ error: 'Name, email, and country are required.' });
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'Name, email, and password are required.' });
     }
 
-    const role = email === 'admin@example.com' ? 'admin' : 'user';
+    const role = email === 'orbital.ecotrack@gmail.com' ? 'admin' : 'user';
+    const defaultAvatar = 'https://kqolfqxyiywlkintnoky.supabase.co/storage/v1/object/public/avatars/default.jpg';
+    const finalAvatar = avatar_url || defaultAvatar;
 
     try {
+      const existing = await pool.query('SELECT 1 FROM users WHERE email = $1', [email]);
+      if (existing.rows.length > 0) {
+        return res.status(409).json({ error: 'Email already registered.' });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+
       const insertQuery = `
-        INSERT INTO users (name, email, country, avatar_url, marketing_opt_in, role)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO users (name, email, country, password, avatar_url, marketing_opt_in, role)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *
       `;
-      const values = [name, email, country, avatar_url, marketing_opt_in, role];
+      const values = [name, email, country, hashedPassword, finalAvatar, marketing_opt_in, role];
       const result = await pool.query(insertQuery, values);
-      return res.status(201).json(result.rows[0]);
+
+      const user = result.rows[0];
+      delete user.password;
+      return res.status(201).json(user);
     } catch (err) {
       console.error('❌ Error inserting user:', err);
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
 
-  // === PUT: Update user ===
+  // === ✅ POST: Login user ===
+  if (method === 'POST' && req.url === '/api/auth/login') {
+    const { email, password } = body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required.' });
+    }
+
+    try {
+      const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+      if (result.rows.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
+
+      const user = result.rows[0];
+      const isValid = await bcrypt.compare(password, user.password);
+      if (!isValid) return res.status(401).json({ error: 'Invalid credentials' });
+
+      delete user.password;
+      return res.status(200).json(user);
+    } catch (err) {
+      console.error('❌ Error logging in:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  // === ✅ PUT: Update user ===
   if (method === 'PUT') {
     const {
       id,
       name,
       email,
       country,
+      password,
       avatar_url,
       marketing_opt_in,
       last_tip_index,
@@ -87,28 +123,60 @@ module.exports = async (req, res) => {
     if (!id) return res.status(400).json({ error: 'User ID is required.' });
 
     try {
+      let updateFields = [];
+      let updateValues = [id];
+
+      if (name !== undefined) {
+        updateValues.push(name);
+        updateFields.push(`name = $${updateValues.length}`);
+      }
+      if (email !== undefined) {
+        updateValues.push(email);
+        updateFields.push(`email = $${updateValues.length}`);
+      }
+      if (country !== undefined) {
+        updateValues.push(country);
+        updateFields.push(`country = $${updateValues.length}`);
+      }
+      if (password !== undefined) {
+        const hashed = await bcrypt.hash(password, 10);
+        updateValues.push(hashed);
+        updateFields.push(`password = $${updateValues.length}`);
+      }
+      if (avatar_url !== undefined) {
+        updateValues.push(avatar_url);
+        updateFields.push(`avatar_url = $${updateValues.length}`);
+      }
+      if (marketing_opt_in !== undefined) {
+        updateValues.push(marketing_opt_in);
+        updateFields.push(`marketing_opt_in = $${updateValues.length}`);
+      }
+      if (last_tip_index !== undefined) {
+        updateValues.push(last_tip_index);
+        updateFields.push(`last_tip_index = $${updateValues.length}`);
+      }
+      if (role !== undefined) {
+        updateValues.push(role);
+        updateFields.push(`role = $${updateValues.length}`);
+      }
+
       const updateQuery = `
-        UPDATE users SET
-          name = COALESCE($2, name),
-          email = COALESCE($3, email),
-          country = COALESCE($4, country),
-          avatar_url = COALESCE($5, avatar_url),
-          marketing_opt_in = COALESCE($6, marketing_opt_in),
-          last_tip_index = COALESCE($7, last_tip_index),
-          role = COALESCE($8, role)
+        UPDATE users SET ${updateFields.join(', ')}
         WHERE id = $1
         RETURNING *
       `;
-      const values = [id, name, email, country, avatar_url, marketing_opt_in, last_tip_index, role];
-      const result = await pool.query(updateQuery, values);
-      return res.status(200).json(result.rows[0]);
+
+      const result = await pool.query(updateQuery, updateValues);
+      const user = result.rows[0];
+      delete user.password;
+      return res.status(200).json(user);
     } catch (err) {
       console.error('❌ Error updating user:', err);
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
 
-  // === DELETE: Remove user ===
+  // === ✅ DELETE: Remove user ===
   if (method === 'DELETE') {
     const { id } = query;
     if (!id) return res.status(400).json({ error: 'User ID is required.' });
@@ -122,6 +190,6 @@ module.exports = async (req, res) => {
     }
   }
 
-  // === Fallback ===
+  // === ❌ Fallback
   return res.status(405).json({ error: 'Method not allowed' });
 };

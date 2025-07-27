@@ -20,6 +20,7 @@
   "homepage": "https://github.com/TechLine08/help-bang-arkin#readme",
   "dependencies": {
     "@supabase/supabase-js": "^2.52.1",
+    "bcrypt": "^6.0.0",
     "dotenv": "^17.2.1",
     "formidable": "^3.5.4",
     "pg": "^8.16.3",
