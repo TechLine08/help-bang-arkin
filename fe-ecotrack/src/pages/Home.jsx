@@ -6,6 +6,7 @@ import Toast from '../components/Toast';
 import { Pie } from 'react-chartjs-2';
 import { Chart, ArcElement, Tooltip, Legend } from 'chart.js';
 import { getApiUrl } from '../config/api';
+import { Link } from 'react-router-dom';
 
 Chart.register(ArcElement, Tooltip, Legend);
 
@@ -306,6 +307,23 @@ export default function Home() {
               )}
             </div>
           )}
+        </div>
+
+        {/* Marketplace Section */}
+        <div className="bg-white shadow-md rounded-lg p-6 mb-10">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-green-600">🏪 Marketplace</h2>
+          </div>
+          <p className="text-gray-600 mb-4">
+            Redeem your points for exciting rewards and vouchers!
+          </p>
+          <Link
+            to="/marketplace"
+            className="inline-flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700 transition-colors"
+          >
+            <span>Browse Vouchers</span>
+            <span>→</span>
+          </Link>
         </div>
 
         {/* Logs */}

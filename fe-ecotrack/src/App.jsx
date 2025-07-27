@@ -21,6 +21,7 @@ import ManageVouchers from './pages/Admin/ManageVouchers';
 // import ViewFeedback from './pages/Admin/ViewFeedback';
 // import SendTips from './pages/Admin/SendTips';
 // import RedeemHistory from './pages/Admin/RedeemHistory';
+import Marketplace from './pages/Marketplace';
 
 function App() {
   return (
@@ -36,6 +37,7 @@ function App() {
 
         {/* 🔐 User Dashboard */}
         <Route path="/home" element={<Home />} />
+        <Route path="/marketplace" element={<Marketplace />} />
 
         {/* 🛡️ Admin Routes */}
         <Route path="/admin" element={<AdminHome />} />

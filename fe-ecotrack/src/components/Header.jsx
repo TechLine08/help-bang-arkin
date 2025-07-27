@@ -71,6 +71,7 @@ const Header = () => {
             user ? (
               <>
                 <Link to="/home" className="hover:text-green-600">Dashboard</Link>
+                <Link to="/marketplace" className="hover:text-green-600">Marketplace</Link>
                 <button
                   onClick={handleLogout}
                   className="bg-red-500 text-white px-4 py-2 rounded-md font-medium hover:bg-red-600"
@@ -110,6 +111,7 @@ const Header = () => {
               user ? (
                 <>
                   <Link to="/home" onClick={closeMenu} className="hover:text-green-600">Dashboard</Link>
+                  <Link to="/marketplace" onClick={closeMenu} className="hover:text-green-600">Marketplace</Link>
                   <button
                     onClick={() => {
                       handleLogout();
