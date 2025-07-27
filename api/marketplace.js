@@ -12,9 +12,9 @@ const pool = new Pool({
   },
 });
 
-// CORS headers
+// 🌐 CORS headers
 const setCors = (res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*'); // Change to your frontend domain in prod
+  res.setHeader('Access-Control-Allow-Origin', '*'); // Set your domain in prod
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 };
@@ -25,20 +25,27 @@ module.exports = async (req, res) => {
   console.log(`🛍️ /api/marketplace invoked with method: ${method}`);
 
   if (method === 'OPTIONS') {
-    // Handle CORS preflight
-    return res.status(200).end();
+    return res.status(200).end(); // Preflight response
   }
 
   if (!pool) {
-    console.error('🔴 Pool is not initialized');
+    console.error('🔴 Pool not initialized');
     return res.status(500).json({ error: 'DB not initialized' });
   }
 
   try {
-    // === GET: List all vouchers ===
+    // === GET: List all non-expired vouchers ===
     if (method === 'GET') {
-      console.log('📥 Fetching vouchers...');
-      const result = await pool.query('SELECT * FROM vouchers ORDER BY created_at DESC');
+      console.log('📥 Fetching vouchers (non-expired only)...');
+      const now = new Date().toISOString();
+
+      const result = await pool.query(
+        `SELECT * FROM vouchers
+         WHERE expires_at IS NULL OR expires_at > $1
+         ORDER BY created_at DESC`,
+        [now]
+      );
+
       console.log(`✅ Fetched ${result.rowCount} vouchers`);
       return res.status(200).json(result.rows);
     }
@@ -49,32 +56,44 @@ module.exports = async (req, res) => {
 
       try {
         if (typeof body === 'string') {
-          body = JSON.parse(body); // For raw JSON POSTs
+          body = JSON.parse(body);
         }
       } catch (err) {
         console.error('❌ Failed to parse request body:', err);
         return res.status(400).json({ error: 'Invalid JSON body' });
       }
 
-      const { name, description, image_url, points_required, stock } = body;
-      console.log('📦 Creating voucher with:', { name, points_required, stock });
+      const { name, description, image_url, points_required, stock, expires_at } = body;
+      console.log('📦 Creating voucher with:', { name, points_required, stock, expires_at });
 
-      if (!name || !description || !image_url || points_required == null || stock == null) {
-        console.warn('⚠️ Missing required fields:', { name, description, image_url, points_required, stock });
+      if (
+        !name ||
+        !description ||
+        !image_url ||
+        points_required == null ||
+        stock == null
+      ) {
+        console.warn('⚠️ Missing required fields:', {
+          name,
+          description,
+          image_url,
+          points_required,
+          stock,
+        });
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
       const result = await pool.query(
-        `INSERT INTO vouchers (name, description, image_url, points_required, stock)
-         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-        [name, description, image_url, points_required, stock]
+        `INSERT INTO vouchers (name, description, image_url, points_required, stock, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+        [name, description, image_url, points_required, stock, expires_at || null]
       );
 
       console.log('✅ Voucher created:', result.rows[0]);
       return res.status(201).json(result.rows[0]);
     }
 
-    // === Unsupported method ===
+    // === Unsupported Method ===
     console.warn('🚫 Method not allowed:', method);
     return res.status(405).json({ error: 'Method not allowed' });
 
