@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../firebase';
 import Header from '../components/Header';
 import Toast from '../components/Toast';
+import { getApiUrl } from '../config/api';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -26,19 +25,38 @@ export default function Login() {
     }
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const res = await fetch(getApiUrl('api/auth'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'login',
+          email,
+          password,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        showToast(data.error || 'Login failed.', 'error');
+        return;
+      }
+
       showToast('Login successful!', 'success');
-      setTimeout(() => navigate('/home'), 500); // redirect to dashboard
+
+      // Save to localStorage/session if needed
+      localStorage.setItem('loggedInUser', JSON.stringify(data));
+
+      setTimeout(() => {
+        if (data.role === 'admin') {
+          navigate('/admin');
+        } else {
+          navigate('/home');
+        }
+      }, 500);
     } catch (error) {
-      const friendly =
-        error.code === 'auth/user-not-found'
-          ? 'No user found with this email.'
-          : error.code === 'auth/wrong-password'
-          ? 'Incorrect password.'
-          : error.code === 'auth/invalid-email'
-          ? 'Invalid email address.'
-          : 'Login failed. Please try again.';
-      showToast(friendly, 'error');
+      console.error('❌ Login error:', error);
+      showToast('Login failed. Please try again.', 'error');
     }
   };
 
