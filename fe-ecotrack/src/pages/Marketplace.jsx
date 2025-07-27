@@ -7,9 +7,11 @@ import { getApiUrl } from '../config/api';
 
 export default function Marketplace() {
   console.log('🏪 Marketplace component rendered');
+
   const [vouchers, setVouchers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
+  const [redeemingId, setRedeemingId] = useState(null);
 
   const showToast = (message, type) => {
     setToast({ message, type });
@@ -33,9 +35,9 @@ export default function Marketplace() {
       });
       console.log('📡 Response status:', res.status);
       console.log('📡 Response headers:', res.headers);
-      
+
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-      
+
       const data = await res.json();
       console.log('📦 Received data:', data);
       setVouchers(Array.isArray(data) ? data : []);
@@ -48,21 +50,52 @@ export default function Marketplace() {
   }, []);
 
   useEffect(() => {
-    // Fetch vouchers immediately if user is already authenticated
     if (auth.currentUser) {
       fetchVouchers();
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      // Fetch vouchers regardless of authentication status
       await fetchVouchers();
     });
+
     return () => unsubscribe();
   }, [fetchVouchers]);
 
-  const handleRedeem = (voucher) => {
-    // TODO: Implement redemption logic
-    showToast(`Redeeming ${voucher.title}...`, 'info');
+  const handleRedeem = async (voucher) => {
+    if (!auth.currentUser) {
+      showToast('You must be logged in to redeem.', 'error');
+      return;
+    }
+
+    try {
+      setRedeemingId(voucher.id);
+      showToast(`Redeeming ${voucher.title}...`, 'info');
+
+      const res = await fetch(getApiUrl('api/redeem-voucher'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: auth.currentUser.uid,
+          voucher_id: voucher.id,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        showToast(data.message || 'Redemption successful!', 'success');
+        await fetchVouchers(); // Refresh stock after redeem
+      } else {
+        showToast(data.error || 'Redemption failed.', 'error');
+      }
+    } catch (err) {
+      console.error('❌ Error redeeming:', err);
+      showToast('Redemption failed.', 'error');
+    } finally {
+      setRedeemingId(null);
+    }
   };
 
   if (loading) {
@@ -97,7 +130,7 @@ export default function Marketplace() {
               >
                 <div className="bg-gray-100 flex items-center justify-center">
                   <img
-                    src="/vouchers/Grab.png"
+                    src={`/vouchers/${voucher.image || 'Grab.png'}`}
                     alt={voucher.title}
                     className="w-full h-48 object-contain"
                     onError={(e) => {
@@ -105,7 +138,7 @@ export default function Marketplace() {
                     }}
                   />
                 </div>
-                
+
                 <div className="p-6">
                   <h3 className="text-lg font-semibold text-gray-800 mb-2">
                     {voucher.title}
@@ -113,7 +146,7 @@ export default function Marketplace() {
                   <p className="text-gray-600 text-sm mb-4">
                     {voucher.description}
                   </p>
-                  
+
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-yellow-500">⭐</span>
@@ -121,7 +154,7 @@ export default function Marketplace() {
                         {voucher.points_required} points
                       </span>
                     </div>
-                    
+
                     <div className="flex items-center gap-2">
                       {voucher.stock > 0 ? (
                         <span className="text-green-600 text-sm font-medium">
@@ -134,17 +167,23 @@ export default function Marketplace() {
                       )}
                     </div>
                   </div>
-                  
+
                   <button
                     onClick={() => handleRedeem(voucher)}
-                    disabled={!voucher.is_active || voucher.stock === 0}
+                    disabled={
+                      !voucher.is_active ||
+                      voucher.stock === 0 ||
+                      redeemingId === voucher.id
+                    }
                     className={`w-full mt-4 py-2 px-4 rounded-md font-medium transition-colors ${
                       voucher.is_active && voucher.stock > 0
-                        ? 'bg-green-600 text-white hover:bg-green-700'
+                        ? redeemingId === voucher.id
+                          ? 'bg-yellow-500 text-white cursor-wait'
+                          : 'bg-green-600 text-white hover:bg-green-700'
                         : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     }`}
                   >
-                    {voucher.is_active && voucher.stock > 0 ? 'Redeem' : 'Unavailable'}
+                    {redeemingId === voucher.id ? 'Redeeming...' : 'Redeem'}
                   </button>
                 </div>
               </div>
@@ -162,4 +201,4 @@ export default function Marketplace() {
       )}
     </div>
   );
-} 
+}
