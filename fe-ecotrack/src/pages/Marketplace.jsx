@@ -98,21 +98,15 @@ export default function Marketplace() {
                 key={voucher.id}
                 className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300"
               >
-                <div className="aspect-w-16 aspect-h-9 bg-gray-100">
-                  {voucher.image_url ? (
-                    <img
-                      src={voucher.image_url}
-                      alt={voucher.title}
-                      className="w-full h-48 object-cover"
-                      onError={(e) => {
-                        e.target.src = '/images/vouchers/default.png';
-                      }}
-                    />
-                  ) : (
-                    <div className="w-full h-48 bg-gradient-to-br from-green-100 to-blue-100 flex items-center justify-center">
-                      <span className="text-4xl">🎁</span>
-                    </div>
-                  )}
+                <div className="bg-gray-100 flex items-center justify-center">
+                  <img
+                    src="/vouchers/Grab.png"
+                    alt={voucher.title}
+                    className="w-full h-48 object-contain"
+                    onError={(e) => {
+                      e.target.src = '/vouchers/Grab.png';
+                    }}
+                  />
                 </div>
                 
                 <div className="p-6">
