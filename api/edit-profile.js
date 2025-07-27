@@ -5,20 +5,20 @@ import { Pool } from 'pg';
 import formidable from 'formidable';
 import fs from 'fs';
 
-// Disable default body parsing so we can handle file uploads
+// === Disable default body parsing for file upload support ===
 export const config = {
   api: {
     bodyParser: false,
   },
 };
 
-// Supabase client
+// === Supabase Client ===
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// PostgreSQL pool
+// === PostgreSQL Pool ===
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
@@ -27,15 +27,12 @@ const pool = new Pool({
 export default async function handler(req, res) {
   console.log('📥 Incoming request to /api/edit-profile');
 
-  // === ✅ CORS headers ===
-  res.setHeader('Access-Control-Allow-Origin', '*'); // Set specific domain in prod
+  // === CORS Headers ===
+  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // === ✅ Preflight handler ===
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
   // === GET: Fetch user profile ===
   if (req.method === 'GET') {
@@ -63,13 +60,13 @@ export default async function handler(req, res) {
         ...user,
         avatar_url: user.avatar_url || defaultAvatar,
       });
-    } catch (e) {
-      console.error('❌ Error fetching user:', e);
+    } catch (err) {
+      console.error('❌ Error fetching user:', err.message);
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
 
-  // === POST: Update profile with optional avatar upload ===
+  // === POST: Update profile (name, country, avatar, opt-in) ===
   if (req.method === 'POST') {
     const form = new formidable.IncomingForm({ keepExtensions: true });
 
@@ -92,7 +89,7 @@ export default async function handler(req, res) {
       let avatar_url = null;
 
       try {
-        // === Upload avatar to Supabase Storage ===
+        // === Upload Avatar if Provided ===
         if (file && file[0] && file[0].filepath) {
           const fileData = file[0];
           const fileBuffer = fs.readFileSync(fileData.filepath);
@@ -107,7 +104,7 @@ export default async function handler(req, res) {
             });
 
           if (uploadError) {
-            console.error('❌ Upload failed:', uploadError);
+            console.error('❌ Upload failed:', uploadError.message);
             return res.status(500).json({ error: 'Failed to upload avatar' });
           }
 
@@ -115,16 +112,16 @@ export default async function handler(req, res) {
             .from('avatars')
             .getPublicUrl(filePath);
 
-          avatar_url = publicURL.publicUrl;
+          avatar_url = publicURL?.publicUrl || null;
         }
 
-        // Normalize marketing_opt_in
+        // === Normalize boolean field ===
         const marketingOpt =
           typeof marketing_opt_in === 'string'
             ? marketing_opt_in.toLowerCase() === 'true'
             : null;
 
-        // === Update user info in DB ===
+        // === Update DB ===
         const result = await pool.query(
           `
           UPDATE users
@@ -139,13 +136,15 @@ export default async function handler(req, res) {
         );
 
         return res.status(200).json(result.rows[0]);
-      } catch (e) {
-        console.error('❌ Error updating profile:', e);
+      } catch (err) {
+        console.error('❌ Error updating profile:', err.message);
         return res.status(500).json({ error: 'Internal server error' });
       }
     });
+
+    return; // prevent duplicate response
   }
 
-  // === Method not allowed ===
+  // === Method Not Allowed ===
   return res.status(405).json({ error: 'Method not allowed' });
 }
