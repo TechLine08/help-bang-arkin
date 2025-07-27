@@ -7,6 +7,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
+// 🚮 Logs to seed
 const logs = [
   {
     id: 'e1111111-aaaa-bbbb-cccc-111111111111',
@@ -36,6 +37,8 @@ const seed = async () => {
   console.log('🌱 Seeding recycling_logs...');
   try {
     for (const log of logs) {
+      console.log(`🔍 Seeding log: ${log.id} (${log.user_email}, ${log.location_name})`);
+
       // 🧑 Get user_id from email
       const userRes = await pool.query(`SELECT id FROM users WHERE email = $1`, [log.user_email]);
       const user = userRes.rows[0];
@@ -52,7 +55,8 @@ const seed = async () => {
         continue;
       }
 
-      await pool.query(
+      // ✅ Insert into recycling_logs
+      const insertRes = await pool.query(
         `
         INSERT INTO recycling_logs (
           id, user_id, location_id, material_type,
@@ -74,15 +78,16 @@ const seed = async () => {
         ]
       );
 
-      console.log(`✅ Inserted log for ${log.user_email} at ${log.location_name}`);
+      console.log(`✅ Inserted: ${log.user_email} ➜ ${log.material_type} @ ${log.location_name}`);
     }
 
     console.log('🌱 Done seeding recycling_logs.');
   } catch (err) {
-    console.error('❌ Error seeding recycling_logs:', err);
+    console.error('❌ Error seeding recycling_logs:', err.stack || err.message);
     throw err;
   } finally {
     await pool.end();
+    console.log('🔌 DB connection closed.');
   }
 };
 

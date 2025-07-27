@@ -9,7 +9,6 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-// 🚀 Leaderboard API Handler
 module.exports = async (req, res) => {
   const { method } = req;
   const { scope = 'individual' } = req.query;
@@ -29,11 +28,20 @@ module.exports = async (req, res) => {
     if (scope === 'country') {
       const result = await pool.query(`
         SELECT
-          country,
-          total_weight,
-          materials,
-          updated_at
-        FROM national_leaderboard
+          u.country,
+          COALESCE(SUM(r.weight_kg), 0) AS total_weight,
+          COALESCE(
+            JSON_OBJECT_AGG(
+              r.material_type,
+              JSON_BUILD_OBJECT(
+                'count', SUM(r.bottle_count),
+                'weight', SUM(r.weight_kg)
+              )
+            ) FILTER (WHERE r.material_type IS NOT NULL), '{}'
+          ) AS materials
+        FROM users u
+        LEFT JOIN recycling_logs r ON u.id = r.user_id
+        GROUP BY u.country
         ORDER BY total_weight DESC
         LIMIT 10;
       `);
@@ -47,16 +55,24 @@ module.exports = async (req, res) => {
     // =====================================
     const result = await pool.query(`
       SELECT
-        l.user_id AS id,
+        u.id,
         u.name,
         u.avatar_url,
         u.country,
-        l.total_weight,
-        l.materials,
-        l.updated_at
-      FROM leaderboard l
-      JOIN users u ON l.user_id = u.id
-      ORDER BY l.total_weight DESC
+        COALESCE(SUM(r.weight_kg), 0) AS total_weight,
+        COALESCE(
+          JSON_OBJECT_AGG(
+            r.material_type,
+            JSON_BUILD_OBJECT(
+              'count', SUM(r.bottle_count),
+              'weight', SUM(r.weight_kg)
+            )
+          ) FILTER (WHERE r.material_type IS NOT NULL), '{}'
+        ) AS materials
+      FROM users u
+      LEFT JOIN recycling_logs r ON u.id = r.user_id
+      GROUP BY u.id, u.name, u.avatar_url, u.country
+      ORDER BY total_weight DESC
       LIMIT 10;
     `);
 
