@@ -38,6 +38,30 @@ module.exports = async (req, res) => {
     return res.status(200).json({ message: '✅ Auth API is live!' });
   }
 
+  // === ✅ POST: Login user ===
+  if (method === 'POST' && body?.action === 'login') {
+    const { email, password } = body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required.' });
+    }
+
+    try {
+      const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+      if (result.rows.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
+
+      const user = result.rows[0];
+      const isValid = await bcrypt.compare(password, user.password);
+      if (!isValid) return res.status(401).json({ error: 'Invalid credentials' });
+
+      delete user.password;
+      return res.status(200).json(user);
+    } catch (err) {
+      console.error('❌ Error logging in:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
   // === ✅ POST: Register user ===
   if (method === 'POST') {
     const {
@@ -78,30 +102,6 @@ module.exports = async (req, res) => {
       return res.status(201).json(user);
     } catch (err) {
       console.error('❌ Error inserting user:', err);
-      return res.status(500).json({ error: 'Internal server error' });
-    }
-  }
-
-  // === ✅ POST: Login user ===
-  if (method === 'POST' && req.url === '/api/auth/login') {
-    const { email, password } = body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required.' });
-    }
-
-    try {
-      const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-      if (result.rows.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
-
-      const user = result.rows[0];
-      const isValid = await bcrypt.compare(password, user.password);
-      if (!isValid) return res.status(401).json({ error: 'Invalid credentials' });
-
-      delete user.password;
-      return res.status(200).json(user);
-    } catch (err) {
-      console.error('❌ Error logging in:', err);
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
@@ -190,6 +190,5 @@ module.exports = async (req, res) => {
     }
   }
 
-  // === ❌ Fallback
   return res.status(405).json({ error: 'Method not allowed' });
 };
