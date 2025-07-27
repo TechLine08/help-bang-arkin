@@ -252,7 +252,7 @@ export default function Home() {
                     </div>
                     <div>
                       <p className="font-medium text-gray-800">
-                        {leaderboardScope === 'country' ? item.country : item.users?.display_name || item.user_id}
+                        {leaderboardScope === 'country' ? item.country : item.users?.display_name}
                       </p>
                     </div>
                   </div>
