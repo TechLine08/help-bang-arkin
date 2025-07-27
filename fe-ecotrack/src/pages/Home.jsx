@@ -18,6 +18,7 @@ export default function Home() {
   const [toast, setToast] = useState(null);
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
+  const [leaderboardScope, setLeaderboardScope] = useState('individual'); // new
 
   const fetchLogs = async (uid) => {
     try {
@@ -39,12 +40,8 @@ export default function Home() {
   const fetchLeaderboard = useCallback(async () => {
     setLoadingLeaderboard(true);
     try {
-      const res = await fetch(getApiUrl('/api/leaderboard'));
-
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-      }
-
+      const res = await fetch(getApiUrl(`/api/leaderboard?scope=${leaderboardScope}`));
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
       const data = await res.json();
       console.log('📊 Leaderboard API response:', data);
 
@@ -67,7 +64,7 @@ export default function Home() {
     } finally {
       setLoadingLeaderboard(false);
     }
-  }, []);
+  }, [leaderboardScope]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -93,10 +90,10 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: user.uid,
-          location_id: 'dummy-location', // TODO: Replace with actual location ID
+          location_id: 'dummy-location',
           material_type: wasteType.trim(),
           bottle_count: Number(quantity),
-          weight_kg: 0.5, // dummy default, update if you collect this
+          weight_kg: 0.5,
         }),
       });
 
@@ -199,7 +196,31 @@ export default function Home() {
 
         {/* Leaderboard */}
         <div className="bg-white shadow-md rounded-lg p-6 mb-10">
-          <h2 className="text-xl font-semibold text-green-600 mb-4 text-center">🏆 Leaderboard</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-green-600">🏆 Leaderboard</h2>
+            <div className="space-x-2">
+              <button
+                className={`px-3 py-1 text-sm rounded-md border ${
+                  leaderboardScope === 'individual'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-white text-green-600'
+                }`}
+                onClick={() => setLeaderboardScope('individual')}
+              >
+                Individuals
+              </button>
+              <button
+                className={`px-3 py-1 text-sm rounded-md border ${
+                  leaderboardScope === 'country'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-white text-green-600'
+                }`}
+                onClick={() => setLeaderboardScope('country')}
+              >
+                Countries
+              </button>
+            </div>
+          </div>
 
           {loadingLeaderboard ? (
             <div className="text-center py-8">
@@ -231,18 +252,17 @@ export default function Home() {
                     </div>
                     <div>
                       <p className="font-medium text-gray-800">
-                        {item.name || item.country}
+                        {leaderboardScope === 'country' ? item.country : item.user_id}
                       </p>
-                      {item.country && (
-                        <p className="text-sm text-gray-500">{item.country}</p>
-                      )}
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="font-semibold text-green-600">
-                      {(item.total_recycled || item.total_bottles || 0).toLocaleString()}
+                      {(item.total_points || item.total_weight || 0).toLocaleString()}
                     </p>
-                    <p className="text-xs text-gray-500">items recycled</p>
+                    <p className="text-xs text-gray-500">
+                      {leaderboardScope === 'country' ? 'kg recycled' : 'points'}
+                    </p>
                   </div>
                 </div>
               ))}
