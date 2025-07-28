@@ -43,6 +43,14 @@ export default function AdminHome() {
             <h2 className="text-xl font-semibold text-green-600 mb-2">📜 Redemption Logs</h2>
             <p className="text-gray-600 text-sm">Track who redeemed what, and when.</p>
           </div>
+
+          <div
+            onClick={() => navigate('/admin/manage-locations')}
+            className="cursor-pointer bg-white shadow-md rounded-lg p-6 hover:shadow-lg transition"
+          >
+            <h2 className="text-xl font-semibold text-green-600 mb-2">📍 Manage Locations</h2>
+            <p className="text-gray-600 text-sm">Add, edit, or remove recycling points.</p>
+          </div>
         </div>
       </div>
     </div>

@@ -20,7 +20,7 @@ export default function Contact() {
     }
 
     try {
-      const res = await fetch(getApiUrl('api/contact'), {
+      const res = await fetch(getApiUrl('api/feedback'), { // ✅ FIXED LINE
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
@@ -39,7 +39,6 @@ export default function Contact() {
     }
   };
 
-  // Auto-dismiss toast after 3 seconds
   useEffect(() => {
     if (toast) {
       const timer = setTimeout(() => setToast(null), 3000);

@@ -6,9 +6,8 @@ import Toast from '../components/Toast';
 import { getApiUrl } from '../config/api';
 
 export default function Marketplace() {
-  console.log('🏪 Marketplace component rendered');
-
   const [vouchers, setVouchers] = useState([]);
+  const [userPoints, setUserPoints] = useState(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [redeemingId, setRedeemingId] = useState(null);
@@ -18,29 +17,14 @@ export default function Marketplace() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  // Log when component mounts
-  useEffect(() => {
-    console.log('🏪 Marketplace component mounted');
-  }, []);
-
-  const fetchVouchers = useCallback(async () => {
+  const fetchVouchers = useCallback(async (uid) => {
     try {
-      console.log('🔍 Fetching vouchers from:', getApiUrl('api/marketplace'));
-      const res = await fetch(getApiUrl('api/marketplace'), {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      });
-      console.log('📡 Response status:', res.status);
-      console.log('📡 Response headers:', res.headers);
-
+      const res = await fetch(getApiUrl(`api/marketplace?user_id=${uid}`));
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
 
       const data = await res.json();
-      console.log('📦 Received data:', data);
-      setVouchers(Array.isArray(data) ? data : []);
+      setVouchers(Array.isArray(data.vouchers) ? data.vouchers : []);
+      setUserPoints(data.points ?? null);
     } catch (err) {
       console.error('❌ Failed to fetch vouchers:', err);
       showToast('Failed to load marketplace data.', 'error');
@@ -51,11 +35,13 @@ export default function Marketplace() {
 
   useEffect(() => {
     if (auth.currentUser) {
-      fetchVouchers();
+      fetchVouchers(auth.currentUser.uid);
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      await fetchVouchers();
+      if (firebaseUser) {
+        await fetchVouchers(firebaseUser.uid);
+      }
     });
 
     return () => unsubscribe();
@@ -86,7 +72,7 @@ export default function Marketplace() {
 
       if (res.ok) {
         showToast(data.message || 'Redemption successful!', 'success');
-        await fetchVouchers(); // Refresh stock after redeem
+        await fetchVouchers(auth.currentUser.uid);
       } else {
         showToast(data.error || 'Redemption failed.', 'error');
       }
@@ -113,9 +99,14 @@ export default function Marketplace() {
         <h1 className="text-3xl font-bold text-green-700 mb-6 text-center">
           🏪 Marketplace
         </h1>
-        <p className="text-gray-600 text-center mb-8">
+        <p className="text-gray-600 text-center mb-2">
           Redeem your points for exciting rewards and vouchers!
         </p>
+        {userPoints !== null && (
+          <p className="text-center text-green-700 font-medium mb-8">
+            Your Points: <span className="font-bold">{userPoints}</span>
+          </p>
+        )}
 
         {vouchers.length === 0 ? (
           <div className="text-center py-12">

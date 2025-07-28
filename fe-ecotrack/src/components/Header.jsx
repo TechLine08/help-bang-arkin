@@ -122,6 +122,7 @@ const Header = () => {
 
             <hr className="my-6" />
 
+            {/* ✅ Drawer Nav for Logged-In Users */}
             <nav className="flex flex-col gap-4 text-base">
               <Link
                 to="/home"
@@ -143,6 +144,13 @@ const Header = () => {
                 className="hover:text-green-600"
               >
                 Edit Profile
+              </Link>
+              <Link
+                to="/contact"
+                onClick={() => setAvatarOpen(false)}
+                className="hover:text-green-600"
+              >
+                Contact
               </Link>
               <button
                 onClick={handleLogout}

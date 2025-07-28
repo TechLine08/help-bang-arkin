@@ -27,9 +27,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
   if (req.method !== 'POST') {
     console.warn('⚠️ Invalid method:', req.method);
@@ -52,7 +50,6 @@ export default async function handler(req, res) {
       console.error('❌ User not found');
       return res.status(404).json({ error: 'User not found' });
     }
-    console.log('✅ User found:', user.email);
 
     // ✅ Fetch voucher
     const voucherRes = await pool.query('SELECT * FROM vouchers WHERE id = $1', [voucher_id]);
@@ -61,38 +58,41 @@ export default async function handler(req, res) {
       console.error('❌ Voucher not found');
       return res.status(404).json({ error: 'Voucher not found' });
     }
-    console.log('✅ Voucher found:', voucher.title);
 
     if (voucher.stock <= 0) {
-      console.warn('❌ Voucher out of stock');
       return res.status(400).json({ error: 'Voucher out of stock' });
     }
 
     if (user.points < voucher.points_required) {
-      console.warn('❌ Not enough points');
       return res.status(400).json({ error: 'Insufficient points' });
     }
 
-    // ✅ Begin transaction
+    // ✅ Transaction: update stock, deduct points, insert redemption
     await pool.query('BEGIN');
-    console.log('🔁 Transaction started');
 
     await pool.query(
       'UPDATE vouchers SET stock = stock - 1 WHERE id = $1',
       [voucher_id]
     );
+
     await pool.query(
       'UPDATE users SET points = points - $1 WHERE id = $2',
       [voucher.points_required, user_id]
     );
+
     await pool.query(
       'INSERT INTO redemptions (user_id, voucher_id, redeemed_at) VALUES ($1, $2, NOW())',
       [user_id, voucher_id]
     );
-    await pool.query('COMMIT');
-    console.log('✅ Stock and points updated, redemption logged');
 
-    // ✅ Compose email
+    await pool.query('COMMIT');
+    console.log('✅ Stock, points updated, redemption logged');
+
+    // ✅ Fetch updated point balance
+    const updatedUserRes = await pool.query('SELECT points FROM users WHERE id = $1', [user_id]);
+    const updatedPoints = updatedUserRes.rows[0].points;
+
+    // ✅ Send email
     const emailHtml = `
       <div style="font-family: Arial, sans-serif; background: #f5f7fa; padding: 30px;">
         <div style="max-width: 600px; margin: auto; background: #fff; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); padding: 30px;">
@@ -102,10 +102,8 @@ export default async function handler(req, res) {
           <p><strong>Voucher:</strong> ${voucher.title}</p>
           <p><strong>Points Used:</strong> ${voucher.points_required}</p>
           <p><strong>Redemption Time:</strong> ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' })}</p>
-
           <p style="margin-top: 20px;">Thank you for taking action with <strong>EcoTrack</strong>. Your eco-points just made a difference! 🌍♻️</p>
           <p>If you have any questions, feel free to contact our support.</p>
-
           <hr style="margin: 30px 0;">
           <p style="text-align: center; color: #777; font-size: 0.85em;">
             Voucher redeemed from the <strong>EcoTrack</strong> platform.<br>
@@ -127,7 +125,10 @@ export default async function handler(req, res) {
 
     console.log('📧 Email sent to:', user.email);
 
-    return res.status(200).json({ message: 'Voucher redeemed and email sent.' });
+    return res.status(200).json({
+      message: 'Voucher redeemed and email sent.',
+      updated_points: updatedPoints,
+    });
   } catch (err) {
     await pool.query('ROLLBACK');
     console.error('❌ Error during redemption:', err);

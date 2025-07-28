@@ -19,7 +19,7 @@ export default function ForgotPassword() {
     e.preventDefault();
     try {
       await sendPasswordResetEmail(auth, email);
-      showToast('Reset link sent! Check your email.');
+      showToast('Reset link sent! Check your email spam.');
     } catch (error) {
       const friendly =
         error.code === 'auth/user-not-found'

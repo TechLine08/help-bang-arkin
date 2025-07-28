@@ -1,48 +1,14 @@
+// File: /scripts/sendMarketingEmails.js
+
 require('dotenv').config();
 const { Pool } = require('pg');
 const nodemailer = require('nodemailer');
 
-// PostgreSQL Pool
+// ✅ PostgreSQL Pool
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
-
-// ✅ Daily Tips — now with title and content
-const tips = [
-  {
-    title: "♻️ Rinse Before You Recycle",
-    content: "Rinse bottles before recycling to avoid contamination and ensure better processing.",
-  },
-  {
-    title: "🌱 Bring Your Own Bag",
-    content: "Always carry a reusable bag when shopping to reduce single-use plastic waste.",
-  },
-  {
-    title: "🔌 Unplug Idle Devices",
-    content: "Unplug electronics that aren’t in use to conserve energy and lower your bills.",
-  },
-  {
-    title: "🚲 Short Trips, Big Impact",
-    content: "Use a bike or walk for short distances to reduce your carbon footprint.",
-  },
-  {
-    title: "📦 Reuse Packaging",
-    content: "Boxes, wraps, and even bubble wrap can be reused before discarding them.",
-  },
-  {
-    title: "💧 Save Water Daily",
-    content: "Turn off the tap while brushing your teeth to save up to 8 gallons per day.",
-  },
-  {
-    title: "🛍 Choose Second-Hand",
-    content: "Before buying new, explore thrift stores for great deals and less waste.",
-  },
-  {
-    title: "🍃 Start Composting",
-    content: "Compost your food scraps to reduce landfill waste and enrich your garden soil.",
-  },
-];
 
 // ✅ Nodemailer setup
 const transporter = nodemailer.createTransport({
@@ -69,11 +35,24 @@ const sendEmail = async ({ to, subject, html }) => {
   }
 };
 
-// ✅ Main tip distribution logic
+// ✅ Main tip distribution logic (now DB-driven)
 const sendTips = async () => {
   const client = await pool.connect();
 
   try {
+    // 🔄 Fetch tips from DB
+    const { rows: allTips } = await client.query(`
+      SELECT id, title, content
+      FROM eco_tips
+      ORDER BY created_at ASC
+    `);
+
+    if (!allTips.length) {
+      console.log('ℹ️ No tips available in eco_tips table.');
+      return;
+    }
+
+    // 🔄 Fetch all subscribed users
     const { rows: users } = await client.query(`
       SELECT id, name, email, last_tip_index
       FROM users
@@ -81,15 +60,15 @@ const sendTips = async () => {
     `);
 
     if (!users.length) {
-      console.log('ℹ️ No subscribed users to send tips.');
+      console.log('ℹ️ No users opted-in for tips.');
       return;
     }
 
     for (const user of users) {
       const index = user.last_tip_index ?? 0;
-      const tip = tips[index];
+      const tip = allTips[index];
 
-      if (!tip) continue; // just in case array gets out of sync
+      if (!tip) continue; // skip if index exceeds tips array
 
       const html = `
         <div style="font-family: sans-serif; padding: 1rem;">
@@ -108,8 +87,11 @@ const sendTips = async () => {
         html,
       });
 
-      const nextIndex = (index + 1) % tips.length;
-      await client.query(`UPDATE users SET last_tip_index = $1 WHERE id = $2`, [nextIndex, user.id]);
+      const nextIndex = (index + 1) % allTips.length;
+      await client.query(
+        `UPDATE users SET last_tip_index = $1 WHERE id = $2`,
+        [nextIndex, user.id]
+      );
     }
 
     console.log(`✅ Sent eco tips to ${users.length} user(s).`);

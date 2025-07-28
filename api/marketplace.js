@@ -21,7 +21,9 @@ const setCors = (res) => {
 
 module.exports = async (req, res) => {
   const method = req.method;
+  const { user_id } = req.query;
   setCors(res);
+
   console.log(`🛍️ /api/marketplace invoked with method: ${method}`);
 
   if (method === 'OPTIONS') {
@@ -34,20 +36,32 @@ module.exports = async (req, res) => {
   }
 
   try {
-    // === GET: List all non-expired vouchers ===
+    // === GET: List all non-expired vouchers + user points ===
     if (method === 'GET') {
-      console.log('📥 Fetching vouchers (non-expired only)...');
       const now = new Date().toISOString();
-
-      const result = await pool.query(
+      console.log('📥 Fetching vouchers...');
+      
+      const voucherResult = await pool.query(
         `SELECT * FROM vouchers
          WHERE expires_at IS NULL OR expires_at > $1
          ORDER BY created_at DESC`,
         [now]
       );
 
-      console.log(`✅ Fetched ${result.rowCount} vouchers`);
-      return res.status(200).json(result.rows);
+      let userPoints = null;
+
+      if (user_id) {
+        console.log('👤 Fetching points for user:', user_id);
+        const userResult = await pool.query('SELECT points FROM users WHERE id = $1', [user_id]);
+        userPoints = userResult.rows[0]?.points ?? null;
+      }
+
+      console.log(`✅ Vouchers: ${voucherResult.rowCount}, Points: ${userPoints}`);
+
+      return res.status(200).json({
+        vouchers: voucherResult.rows,
+        points: userPoints,
+      });
     }
 
     // === POST: Create new voucher ===
@@ -64,7 +78,7 @@ module.exports = async (req, res) => {
       }
 
       const { name, description, image_url, points_required, stock, expires_at } = body;
-      console.log('📦 Creating voucher with:', { name, points_required, stock, expires_at });
+      console.log('📦 Creating voucher with:', { name, points_required, stock });
 
       if (
         !name ||

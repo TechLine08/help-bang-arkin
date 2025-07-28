@@ -6,6 +6,7 @@ export default function ViewFeedback() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
 
+  // ✅ Fetch feedbacks on mount
   useEffect(() => {
     const fetchFeedbacks = async () => {
       try {
@@ -23,6 +24,27 @@ export default function ViewFeedback() {
 
     fetchFeedbacks();
   }, []);
+
+  // 🗑️ Optional delete handler (future use)
+  const handleDelete = async (id) => {
+    const confirm = window.confirm('Are you sure you want to delete this feedback?');
+    if (!confirm) return;
+
+    try {
+      const res = await fetch(getApiUrl(`api/feedback?id=${id}`), { method: 'DELETE' });
+      if (res.ok) {
+        setFeedbacks((prev) => prev.filter((f) => f.id !== id));
+        setToast('Feedback deleted.');
+      } else {
+        throw new Error('Failed to delete');
+      }
+    } catch (err) {
+      console.error('❌ Delete error:', err);
+      setToast('Could not delete feedback.');
+    } finally {
+      setTimeout(() => setToast(null), 3000);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white pt-32 pb-20 px-4">
@@ -42,15 +64,24 @@ export default function ViewFeedback() {
         ) : (
           <ul className="space-y-4">
             {feedbacks.map((fb) => (
-              <li key={fb.id} className="bg-white p-4 rounded-lg shadow-md">
+              <li key={fb.id} className="bg-white p-4 rounded-lg shadow-md relative">
                 <div className="mb-2">
                   <span className="font-semibold text-green-600">{fb.name}</span>{' '}
                   <span className="text-gray-500 text-sm">&lt;{fb.email}&gt;</span>
                 </div>
                 <p className="text-gray-800">{fb.message}</p>
                 <div className="text-sm text-gray-400 mt-2">
-                  {new Date(fb.submitted_at).toLocaleString()}
+                  {new Date(fb.created_at).toLocaleString()}
                 </div>
+
+                {/* 🗑️ Optional Delete Button */}
+                <button
+                  onClick={() => handleDelete(fb.id)}
+                  className="absolute top-2 right-2 text-red-500 hover:text-red-700 text-sm"
+                  title="Delete"
+                >
+                  ✕
+                </button>
               </li>
             ))}
           </ul>
