@@ -5,7 +5,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// ✅ CORS helper
+// CORS helper
 const setCorsHeaders = (res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -24,43 +24,78 @@ export default async function handler(req, res) {
   }
 
   const { scope = 'individual', material_type } = req.query;
-  let query;
 
   try {
     if (scope === 'country') {
-      query = supabase
+      let { data, error } = await supabase
         .from('national_leaderboard')
         .select('country, total_weight, updated_at, materials');
 
-      if (material_type) {
-        query = query.filter(`materials->${material_type}->>count`, 'is not', null);
-      }
-
-      const { data, error } = await query;
-
       if (error) throw error;
+
+      if (material_type) {
+        data = data.filter(
+          (entry) =>
+            entry.materials &&
+            entry.materials[material_type] &&
+            entry.materials[material_type].count !== null
+        );
+      }
 
       const sorted = data.sort((a, b) => b.total_weight - a.total_weight);
       return res.status(200).json(sorted);
     } else {
-      query = supabase
+      // First get all leaderboard entries
+      let { data: leaderboardData, error: lbError } = await supabase
         .from('leaderboard')
-        .select('user_id, total_points, total_weight, year, week, materials')
+        .select('*')
         .eq('period', 'weekly');
 
+      if (lbError) throw lbError;
+
+      // Extract all unique user IDs
+      const userIds = [...new Set(leaderboardData.map(entry => entry.user_id))];
+
+      // Then get all user profiles in one query
+      let { data: userProfiles, error: upError } = await supabase
+        .from('users')  // or 'profiles' - use your actual table name
+        .select('id, name')
+        .in('id', userIds);
+
+      if (upError) throw upError;
+
+      // Create a map of user_id to name for easy lookup
+      const userMap = {};
+      userProfiles.forEach(user => {
+        userMap[user.id] = user.name || 'Anonymous Recycler';
+      });
+
+      // Combine the data
+      const enrichedData = leaderboardData.map(entry => ({
+        ...entry,
+        name: userMap[entry.user_id] || 'Anonymous Recycler'
+      }));
+
+      // Filter by material type if specified
       if (material_type) {
-        query = query.filter(`materials->${material_type}->>count`, 'is not', null);
+        enrichedData = enrichedData.filter(
+          entry =>
+            entry.materials &&
+            entry.materials[material_type] &&
+            entry.materials[material_type].count !== null
+        );
       }
 
-      const { data, error } = await query;
+      // Sort by total_points descending
+      const sorted = enrichedData.sort((a, b) => b.total_points - a.total_points);
 
-      if (error) throw error;
-
-      const sorted = data.sort((a, b) => b.total_points - a.total_points);
       return res.status(200).json(sorted);
     }
   } catch (err) {
     console.error('❌ Leaderboard API Error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: err.message 
+    });
   }
 }

@@ -1,4 +1,3 @@
-// File: /api/marketplace.js
 
 require('dotenv').config();
 const { Pool } = require('pg');

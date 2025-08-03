@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebase';
 import Header from '../components/Header';
 import Toast from '../components/Toast';
-import { getApiUrl } from '../config/api';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -25,35 +26,46 @@ export default function Login() {
     }
 
     try {
-      console.log('📤 Sending login request...');
-      const res = await fetch(getApiUrl('api/auth'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'login', email, password }),
-      });
+      // ✅ Firebase login
+      const { user } = await signInWithEmailAndPassword(auth, email, password);
+      const firebase_uid = user.uid;
 
-      const data = await res.json();
-      console.log('📥 Login response:', data);
+      // ✅ Fetch user from backend using firebase_uid
+      const res = await fetch(`https://help-bang-arkin-backend.vercel.app/api/auth?firebase_uid=${firebase_uid}`);
+      const userData = await res.json();
 
       if (!res.ok) {
-        showToast(data?.error || 'Login failed. Please try again.', 'error');
-        return;
+        throw new Error(userData.error || 'Failed to fetch user data');
       }
 
-      // Save user to localStorage or context
-      localStorage.setItem('loggedInUser', JSON.stringify(data));
-      if (data.role === 'admin') {
-        localStorage.setItem('navbarSource', 'admin');
-        navigate('/admin');
-      } else {
-        localStorage.setItem('navbarSource', 'dashboard');
-        navigate('/home');
-      }
+      // ✅ Log full response and role for debugging
+      console.log('✅ Full user data:', userData);
+      console.log('✅ User role:', userData.role);
+
+      // ✅ Save to localStorage
+      localStorage.setItem('loggedInUser', JSON.stringify(userData));
 
       showToast('Login successful!', 'success');
+
+      // ✅ Navigate based on role
+      setTimeout(() => {
+        if (userData.role === 'admin') {
+          navigate('/admin');
+        } else {
+          navigate('/home');
+        }
+      }, 500);
     } catch (error) {
-      console.error('❌ Login error:', error);
-      showToast('Login failed. Please try again.', 'error');
+      console.error('Login error:', error);
+      const friendly =
+        error.code === 'auth/user-not-found'
+          ? 'No user found with this email.'
+          : error.code === 'auth/wrong-password'
+          ? 'Incorrect password.'
+          : error.code === 'auth/invalid-email'
+          ? 'Invalid email address.'
+          : error.message || 'Login failed. Please try again.';
+      showToast(friendly, 'error');
     }
   };
 
@@ -62,15 +74,9 @@ export default function Login() {
       className="relative min-h-screen w-full bg-cover bg-center bg-no-repeat overflow-hidden"
       style={{ backgroundImage: "url('/loginbg.jpg')" }}
     >
-      {/* Overlay */}
       <div className="absolute inset-0 bg-black bg-opacity-50 z-0" />
+      <div className="relative z-20"><Header /></div>
 
-      {/* Header */}
-      <div className="relative z-20">
-        <Header />
-      </div>
-
-      {/* Login Form */}
       <div className="relative z-10 flex items-center justify-center min-h-screen px-4 pt-4 pb-8">
         <div className="bg-white bg-opacity-90 backdrop-blur-lg p-8 rounded-xl shadow-lg max-w-md w-full">
           <h2 className="text-3xl font-bold text-center text-green-700 mb-6">Login</h2>
@@ -84,7 +90,6 @@ export default function Login() {
               required
               className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
             />
-
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
@@ -95,19 +100,17 @@ export default function Login() {
                 className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
               />
               <span
-                onClick={() => setShowPassword((prev) => !prev)}
+                onClick={() => setShowPassword(prev => !prev)}
                 className="absolute right-3 top-2.5 text-sm cursor-pointer text-green-700 font-semibold"
               >
                 {showPassword ? 'Hide' : 'Show'}
               </span>
             </div>
-
             <div className="text-right">
               <Link to="/forgot-password" className="text-sm text-green-600 hover:underline">
                 Forgot Password?
               </Link>
             </div>
-
             <button
               type="submit"
               className="w-full bg-green-600 text-white py-2 rounded-md font-semibold hover:bg-green-700 transition"
@@ -128,14 +131,7 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Toast Message */}
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

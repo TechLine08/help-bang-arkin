@@ -1,47 +1,29 @@
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 
+// ✅ PostgreSQL pool connection
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
 
+// ✅ Main handler
 module.exports = async (req, res) => {
-  const { method, query, body } = req;
+  const { method, query, body, url } = req;
 
-  // === ✅ CORS headers ===
+  // ✅ CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
   if (method === 'OPTIONS') return res.status(200).end();
 
-  console.log(`📥 [${method}] /api/auth`);
+  console.log(`📥 [${method}] ${url}`);
 
-  // === ✅ GET: Fetch user by ID ===
-  if (method === 'GET') {
-    const { id } = query;
-    if (id) {
-      try {
-        const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
-        if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
-
-        const user = result.rows[0];
-        delete user.password;
-        return res.status(200).json(user);
-      } catch (err) {
-        console.error('❌ Error fetching user:', err);
-        return res.status(500).json({ error: 'Internal server error' });
-      }
-    }
-
-    return res.status(200).json({ message: '✅ Auth API is live!' });
-  }
-
-  // === ✅ POST: Login user ===
-  if (method === 'POST' && body?.action === 'login') {
+  // =========================
+  // 🔑 POST /api/auth/login
+  // =========================
+  if (method === 'POST' && url.includes('/login')) {
     const { email, password } = body;
-
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required.' });
     }
@@ -62,19 +44,45 @@ module.exports = async (req, res) => {
     }
   }
 
-  // === ✅ POST: Register user ===
+  // =========================
+  // 🔍 GET /api/auth?firebase_uid=xyz
+  // =========================
+  if (method === 'GET') {
+    const { firebase_uid } = query;
+    if (!firebase_uid) {
+      return res.status(400).json({ error: 'firebase_uid is required' });
+    }
+
+    try {
+      const result = await pool.query('SELECT * FROM users WHERE firebase_uid = $1', [firebase_uid]);
+      if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+      const user = result.rows[0];
+      delete user.password;
+      return res.status(200).json(user);
+    } catch (err) {
+      console.error('❌ Error fetching user:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  // =========================
+  // 🧑‍💻 POST /api/auth
+  // Register new user
+  // =========================
   if (method === 'POST') {
     const {
       name,
       email,
-      country = null,
       password,
+      firebase_uid,
       avatar_url,
-      marketing_opt_in = false,
+      country = null,
+      marketing_opt_in = false
     } = body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Name, email, and password are required.' });
+    if (!name || !email || !password || !firebase_uid) {
+      return res.status(400).json({ error: 'Name, email, password, and firebase_uid are required.' });
     }
 
     const role = email === 'orbital.ecotrack@gmail.com' ? 'admin' : 'user';
@@ -82,49 +90,56 @@ module.exports = async (req, res) => {
     const finalAvatar = avatar_url || defaultAvatar;
 
     try {
-      const existing = await pool.query('SELECT 1 FROM users WHERE email = $1', [email]);
+      const existing = await pool.query(
+        'SELECT 1 FROM users WHERE email = $1 OR firebase_uid = $2',
+        [email, firebase_uid]
+      );
+
       if (existing.rows.length > 0) {
-        return res.status(409).json({ error: 'Email already registered.' });
+        return res.status(409).json({ error: 'User already registered.' });
       }
 
-      const hashedPassword = await bcrypt.hash(password, 10);
+      const hashed = await bcrypt.hash(password, 10);
 
       const insertQuery = `
-        INSERT INTO users (name, email, country, password, avatar_url, marketing_opt_in, role)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO users (firebase_uid, name, email, password, avatar_url, country, marketing_opt_in, role)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *
       `;
-      const values = [name, email, country, hashedPassword, finalAvatar, marketing_opt_in, role];
-      const result = await pool.query(insertQuery, values);
+      const values = [firebase_uid, name, email, hashed, finalAvatar, country, marketing_opt_in, role];
 
+      const result = await pool.query(insertQuery, values);
       const user = result.rows[0];
       delete user.password;
       return res.status(201).json(user);
     } catch (err) {
-      console.error('❌ Error inserting user:', err);
+      console.error('❌ Error creating user:', err);
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
 
-  // === ✅ PUT: Update user ===
+  // =========================
+  // ✏️ PUT /api/auth
+  // Update user by firebase_uid
+  // =========================
   if (method === 'PUT') {
     const {
-      id,
+      firebase_uid,
       name,
       email,
-      country,
       password,
       avatar_url,
+      country,
       marketing_opt_in,
       last_tip_index,
       role,
     } = body;
 
-    if (!id) return res.status(400).json({ error: 'User ID is required.' });
+    if (!firebase_uid) return res.status(400).json({ error: 'firebase_uid is required.' });
 
     try {
-      let updateFields = [];
-      let updateValues = [id];
+      const updateFields = [];
+      const updateValues = [];
 
       if (name !== undefined) {
         updateValues.push(name);
@@ -160,13 +175,13 @@ module.exports = async (req, res) => {
         updateFields.push(`role = $${updateValues.length}`);
       }
 
-      const updateQuery = `
-        UPDATE users SET ${updateFields.join(', ')}
-        WHERE id = $1
-        RETURNING *
-      `;
+      updateValues.push(firebase_uid); // where clause
 
-      const result = await pool.query(updateQuery, updateValues);
+      const result = await pool.query(
+        `UPDATE users SET ${updateFields.join(', ')} WHERE firebase_uid = $${updateValues.length} RETURNING *`,
+        updateValues
+      );
+
       const user = result.rows[0];
       delete user.password;
       return res.status(200).json(user);
@@ -176,19 +191,27 @@ module.exports = async (req, res) => {
     }
   }
 
-  // === ✅ DELETE: Remove user ===
+  // =========================
+  // 🗑 DELETE /api/auth?firebase_uid=xyz
+  // =========================
   if (method === 'DELETE') {
-    const { id } = query;
-    if (!id) return res.status(400).json({ error: 'User ID is required.' });
+    const { firebase_uid } = query;
+    if (!firebase_uid) return res.status(400).json({ error: 'firebase_uid is required' });
 
     try {
-      await pool.query('DELETE FROM users WHERE id = $1', [id]);
-      return res.status(200).json({ message: 'User deleted successfully' });
+      await pool.query('DELETE FROM users WHERE firebase_uid = $1', [firebase_uid]);
+      return res.status(200).json({ success: true });
     } catch (err) {
       console.error('❌ Error deleting user:', err);
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
 
-  return res.status(405).json({ error: 'Method not allowed' });
+  // =========================
+  // ❌ Method Not Allowed
+  // =========================
+  return res.status(405).json({
+    error: 'Method not allowed',
+    message: 'Use GET with ?firebase_uid= or POST/PUT/DELETE with valid body.'
+  });
 };

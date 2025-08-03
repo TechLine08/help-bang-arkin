@@ -1,4 +1,3 @@
-// File: /api/locations.js
 
 const { Pool } = require('pg');
 const formidable = require('formidable');

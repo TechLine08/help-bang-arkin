@@ -2,31 +2,26 @@
 
 const { Pool } = require('pg');
 
-// ✅ PostgreSQL Pool
+// PostgreSQL Pool
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
 
-// ✅ CORS Middleware
-const allowCors = (handler) => async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*'); // Use frontend domain in prod
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+module.exports = async (req, res) => {
+  const { method, body } = req;
+
+  // ✅ Allow CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  return handler(req, res);
-};
 
-// ✅ Main Handler
-const handler = async (req, res) => {
-  const { method, body, query } = req;
+  if (method === 'OPTIONS') return res.status(200).end(); // CORS preflight
 
-  // ✅ GET: Fetch all feedbacks (Admin)
+  // ✅ GET: Return all feedbacks
   if (method === 'GET') {
     try {
-      const result = await pool.query(
-        'SELECT * FROM eco_feedback ORDER BY created_at DESC'
-      );
+      const result = await pool.query('SELECT * FROM feedback ORDER BY created_at DESC');
       return res.status(200).json(result.rows);
     } catch (err) {
       console.error('❌ GET /api/feedback error:', err.message);
@@ -34,7 +29,7 @@ const handler = async (req, res) => {
     }
   }
 
-  // ✅ POST: Submit new feedback (User)
+  // ✅ POST: Save feedback (name, email, message)
   if (method === 'POST') {
     const { name, email, message } = body;
 
@@ -43,34 +38,17 @@ const handler = async (req, res) => {
     }
 
     try {
-      const result = await pool.query(
-        'INSERT INTO eco_feedback (name, email, message) VALUES ($1, $2, $3) RETURNING *',
+      await pool.query(
+        `INSERT INTO feedback (name, email, message) VALUES ($1, $2, $3)`,
         [name, email, message]
       );
-      return res.status(201).json(result.rows[0]);
-    } catch (err) {
-      console.error('❌ POST /api/feedback error:', err.message);
-      return res.status(500).json({ error: 'Failed to submit feedback' });
-    }
-  }
-
-  // ✅ DELETE: Remove feedback by ID (Admin)
-  if (method === 'DELETE') {
-    const { id } = query;
-
-    if (!id) return res.status(400).json({ error: 'Missing feedback ID' });
-
-    try {
-      await pool.query('DELETE FROM eco_feedback WHERE id = $1', [id]);
       return res.status(200).json({ success: true });
     } catch (err) {
-      console.error('❌ DELETE /api/feedback error:', err.message);
-      return res.status(500).json({ error: 'Failed to delete feedback' });
+      console.error('❌ POST /api/feedback error:', err.message);
+      return res.status(500).json({ error: 'Failed to save feedback' });
     }
   }
 
-  // ❌ Unsupported Method
+  // ❌ Method not allowed
   return res.status(405).json({ error: 'Method not allowed' });
 };
-
-module.exports = allowCors(handler);

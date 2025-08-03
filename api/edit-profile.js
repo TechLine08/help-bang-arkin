@@ -1,5 +1,3 @@
-// File: /api/edit-profile.js
-
 import { createClient } from '@supabase/supabase-js';
 import { Pool } from 'pg';
 import formidable from 'formidable';

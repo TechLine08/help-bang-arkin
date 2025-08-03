@@ -1,9 +1,8 @@
-// File: /api/redeem-voucher.js
 
 import { Pool } from 'pg';
 import nodemailer from 'nodemailer';
 
-// ✅ PostgreSQL setup
+// PostgreSQL setup
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
@@ -11,7 +10,7 @@ const pool = new Pool({
 
 const ADMIN_EMAIL = 'orbital.ecotrack@gmail.com';
 
-// ✅ Email Transporter
+// Email Transporter
 const transporter = nodemailer.createTransport({
   host: process.env.MAIL_HOST,
   port: process.env.MAIL_PORT,
@@ -22,7 +21,7 @@ const transporter = nodemailer.createTransport({
 });
 
 export default async function handler(req, res) {
-  // ✅ CORS headers
+  // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -43,7 +42,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // ✅ Fetch user
+    // Fetch user
     const userRes = await pool.query('SELECT * FROM users WHERE id = $1', [user_id]);
     const user = userRes.rows[0];
     if (!user) {
@@ -51,7 +50,7 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // ✅ Fetch voucher
+    // Fetch voucher
     const voucherRes = await pool.query('SELECT * FROM vouchers WHERE id = $1', [voucher_id]);
     const voucher = voucherRes.rows[0];
     if (!voucher) {
@@ -67,7 +66,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Insufficient points' });
     }
 
-    // ✅ Transaction: update stock, deduct points, insert redemption
+    // Transaction: update stock, deduct points, insert redemption
     await pool.query('BEGIN');
 
     await pool.query(
@@ -88,11 +87,11 @@ export default async function handler(req, res) {
     await pool.query('COMMIT');
     console.log('✅ Stock, points updated, redemption logged');
 
-    // ✅ Fetch updated point balance
+    // Fetch updated point balance
     const updatedUserRes = await pool.query('SELECT points FROM users WHERE id = $1', [user_id]);
     const updatedPoints = updatedUserRes.rows[0].points;
 
-    // ✅ Send email
+    // Send email
     const emailHtml = `
       <div style="font-family: Arial, sans-serif; background: #f5f7fa; padding: 30px;">
         <div style="max-width: 600px; margin: auto; background: #fff; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); padding: 30px;">

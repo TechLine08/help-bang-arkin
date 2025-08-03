@@ -7,6 +7,8 @@ import { Pie } from 'react-chartjs-2';
 import { Chart, ArcElement, Tooltip, Legend } from 'chart.js';
 import { getApiUrl } from '../config/api';
 import { Link } from 'react-router-dom';
+import Select from 'react-select';
+
 
 Chart.register(ArcElement, Tooltip, Legend);
 
@@ -14,8 +16,9 @@ export default function Home() {
   const [user, setUser] = useState(null);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [wasteType, setWasteType] = useState('');
+  const [selectedWasteType, setSelectedWasteType] = useState(null);
   const [quantity, setQuantity] = useState('');
+  const [selectedLocationOption, setSelectedLocationOption] = useState(null);
   const [toast, setToast] = useState(null);
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [userRank, setUserRank] = useState(null);
@@ -37,22 +40,14 @@ export default function Home() {
   };
 
   const fetchLocations = useCallback(async () => {
-    console.log('🔍 Fetching locations...');
     setLoadingLocations(true);
     try {
       const res = await fetch(getApiUrl('api/locations'));
-      console.log('📡 Locations API response:', res.status);
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
       const data = await res.json();
-      console.log('📦 Locations data:', data);
-      
-      // Add hardcoded image URL to each location
       const locationsWithImages = Array.isArray(data) ? data.map(location => ({
         ...location,
         image_url: '/locations/recycle_1.png'
       })) : [];
-      
-      console.log('🖼️ Locations with images:', locationsWithImages);
       setLocations(locationsWithImages);
     } catch (err) {
       console.error('❌ Failed to fetch locations:', err);
@@ -72,30 +67,18 @@ export default function Home() {
     setLoadingLeaderboard(true);
     try {
       const res = await fetch(getApiUrl(`/api/leaderboard?scope=${leaderboardScope}`));
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
       const data = await res.json();
-
       const allData = Array.isArray(data)
         ? data
         : data?.success && Array.isArray(data.data)
         ? data.data
         : [];
-
-      if (allData.length === 0) {
-        showToast('No leaderboard data found.', 'info');
-      }
-
       if (leaderboardScope === 'individual' && user) {
         const index = allData.findIndex((entry) => entry.user_id === user.uid);
-        if (index !== -1) {
-          setUserRank({ ...allData[index], rank: index + 1 });
-        } else {
-          setUserRank(null);
-        }
+        setUserRank(index !== -1 ? { ...allData[index], rank: index + 1 } : null);
       } else {
         setUserRank(null);
       }
-
       setLeaderboardData(allData.slice(0, 3));
     } catch (err) {
       console.error('❌ Failed to fetch leaderboard:', err);
@@ -113,7 +96,7 @@ export default function Home() {
         setUser(firebaseUser);
         await fetchLogs(firebaseUser.uid);
         await fetchLeaderboard();
-        await fetchLocations(); // Fetch locations when user logs in
+        await fetchLocations();
       } else {
         setUser(null);
         setLoading(false);
@@ -124,7 +107,11 @@ export default function Home() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!user || !wasteType.trim() || !quantity) return;
+
+    if (!user || !selectedWasteType || !quantity || !selectedLocationOption) {
+      showToast('Please fill in all fields.', 'error');
+      return;
+    }
 
     try {
       const res = await fetch(getApiUrl('api/progress'), {
@@ -132,17 +119,21 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: user.uid,
-          location_id: 'dummy-location',
-          material_type: wasteType.trim(),
+          location_id: selectedLocationOption.value,
+          material_type: selectedWasteType.value,
           bottle_count: Number(quantity),
-          weight_kg: 0.5,
+          weight_kg: Number(quantity) * 0.1,
+          points_awarded: 5,
+          photo_url: null,
         }),
       });
 
       if (!res.ok) throw new Error('Failed to submit');
 
-      setWasteType('');
+      setSelectedWasteType(null);
       setQuantity('');
+      setSelectedLocationOption(null);
+
       showToast('Activity logged!', 'success');
       fetchLogs(user.uid);
     } catch (err) {
@@ -188,19 +179,24 @@ export default function Home() {
         <div className="bg-white shadow-md rounded-lg p-6 mb-10">
           <h2 className="text-xl font-semibold text-green-600 mb-4">Log Recycling Activity</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
+            
             <div>
-              <label htmlFor="wasteType" className="block text-sm font-medium mb-1">
-                Waste Type
-              </label>
-              <input
-                id="wasteType"
-                type="text"
-                value={wasteType}
-                onChange={(e) => setWasteType(e.target.value)}
-                placeholder="e.g. Plastic, Paper, Glass"
-                className="w-full px-4 py-2 border rounded-md"
+              <label className="block text-sm font-medium mb-1">Waste Type</label>
+              <Select
+                options={[
+                  { value: 'Plastic', label: 'Plastic' },
+                  { value: 'Aluminum', label: 'Aluminum' },
+                  { value: 'Glass', label: 'Glass' },
+                  { value: 'Paper', label: 'Paper' },
+                  { value: 'Other', label: 'Other' },
+                ]}
+                value={selectedWasteType}
+                onChange={setSelectedWasteType}
+                placeholder="Select material type"
+                isSearchable={false}
               />
             </div>
+
             <div>
               <label htmlFor="quantity" className="block text-sm font-medium mb-1">
                 Quantity
@@ -215,6 +211,23 @@ export default function Home() {
                 className="w-full px-4 py-2 border rounded-md"
               />
             </div>
+
+            <div>
+              <label htmlFor="location" className="block text-sm font-medium mb-1">
+                Recycling Location
+              </label>
+              <Select
+                options={locations.map((loc) => ({
+                  value: loc.id,
+                  label: `${loc.name} - ${loc.city}`,
+                }))}
+                value={selectedLocationOption}
+                onChange={setSelectedLocationOption}
+                placeholder="Select a recycling location"
+                isDisabled={loadingLocations || locations.length === 0}
+              />
+            </div>
+
             <button
               type="submit"
               className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition w-full"
@@ -296,7 +309,7 @@ export default function Home() {
                       <p className="font-medium text-gray-800">
                         {leaderboardScope === 'country'
                           ? item.country
-                          : item.users?.display_name || item.user_id}
+                          : item.users?.display_name || item.name || item.user_id}
                       </p>
                     </div>
                   </div>

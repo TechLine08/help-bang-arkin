@@ -6,6 +6,7 @@ import { getApiUrl } from '../config/api';
 export default function Contact() {
   const [form, setForm] = useState({ name: '', email: '', message: '' });
   const [toast, setToast] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -14,16 +15,20 @@ export default function Contact() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!form.name || !form.email || !form.message) {
+    const { name, email, message } = form;
+
+    if (!name || !email || !message) {
       setToast({ type: 'error', message: 'Please fill in all fields.' });
       return;
     }
 
     try {
-      const res = await fetch(getApiUrl('api/feedback'), { // ✅ FIXED LINE
+      setLoading(true);
+
+      const res = await fetch(getApiUrl('api/feedback'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ name, email, message }),
       });
 
       const data = await res.json();
@@ -35,7 +40,10 @@ export default function Contact() {
         throw new Error(data?.error || 'Submission failed.');
       }
     } catch (err) {
+      console.error('❌ Feedback submission error:', err);
       setToast({ type: 'error', message: 'Internal Server Error' });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -101,9 +109,12 @@ export default function Contact() {
           <div className="text-right">
             <button
               type="submit"
-              className="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 rounded-md shadow-md transition"
+              disabled={loading}
+              className={`bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 rounded-md shadow-md transition ${
+                loading ? 'opacity-50 cursor-wait' : ''
+              }`}
             >
-              Send Message
+              {loading ? 'Sending...' : 'Send Message'}
             </button>
           </div>
         </form>
