@@ -67,6 +67,7 @@ export default function Signup() {
           password,
           country: country.value,
           marketing_opt_in,
+          firebase_uid: userCredential.user.reloadUserInfo.localId,
         }),
       });
 
